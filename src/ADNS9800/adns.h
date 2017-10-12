@@ -28,23 +28,22 @@ class ADNS
 	// Constructor
 	ADNS(int chipSelectPin) : _chipSelectPin(chipSelectPin){};
 
-	// User Interface
+	// Setup
 	bool begin();
 	bool begin(const uint16_t resolutionCPI, const uint16_t minSampleRateHz = ADNS_DEFAULT_SENSOR_MINSAMPLERATE);
-	void start(void);
-	void stop(void);
-	void capture(void);
-	bool available(void);
-	void acquireDisplacement(int16_t &dx, int16_t &dy);
-	void triggerSampleSync(void);				 //todo
-	bool triggerSampleReadout(displacement_t &); //todo
 
-	// Operation (triggered reads)
-	bool checkMotionSinceLastReadout();
-	void readLatchedDisplacementRegisters(displacement_t &);
-	void motionBurstRead(readout_data_raw_t &);
+	// Trigger Start, Capture, & Readout
+	void triggerAcquisitionStart();
+	void triggerSampleCapture();
+	bool triggerSampleReadout();
+
+	// Burst Motion Check & Readout
+	void motionBurstRead(adns_raw_readout_t &);
 	void latchMotionDataForBurstRead(); //todo call checkMotionLastBurst or similar
 	bool readLatchedDisplacementDataBurst(byte *buf, size_t numBytes = ADNS_BURST_READ_MAX_BYTES);
+
+	// Timing & Conversion
+	void setAcquisitionStartTime(const adns_time_t timeOrigin = 0x00000000);
 
 	// Sensor Communication (SPI)
 	inline void select();
@@ -67,7 +66,6 @@ class ADNS
   protected:
 	// Configuration
 	void initialize();
-	void resetCounters();
 	void powerUpSensor();
 	void shutDownSensor();
 	void resetSensor();
@@ -82,33 +80,30 @@ class ADNS
 	//-------------------------------------
 
 	// Status Flags
-	bool _sensorConfiguredFlag = false;
+	bool _configuredFlag = false;
 	bool _initializedFlag = false;
-	volatile bool _selectFlag = false;
-	volatile bool _unreadDisplacementLatchedFlag = false;
+	volatile bool _runningFlag = false;
+	volatile bool _selectedFlag = false;
+	volatile bool _sampleCapturedFlag = false;
 
 	// Hardware Configuration (Pins) //todo should be made all const
 	const int _chipSelectPin;
 	int _motionSensePin;
-	size_t _numBytes = ADNS_BURST_READ_MAX_BYTES; //todo setNumBytesBurstRead
+	size_t _numBytes = ADNS_BURST_READ_MAX_BYTES; //todo
 
-	// Running Records and Current Sensor Settings
+	// Current Sensor Settings
 	String _firmwareRevision;
-	uint32_t _beginMillisCount;
-	uint32_t _beginMicrosCount;
-	uint32_t _motionCount;
-	uint32_t _pollCount;
 	uint16_t _resolution = ADNS_DEFAULT_SENSOR_RESOLUTION;
 	uint16_t _maxSamplePeriod;
 	uint16_t _minSampleRate = ADNS_DEFAULT_SENSOR_MINSAMPLERATE;
 
 	// Readout Data
-	volatile elapsedMicros _sampleStartTime; //todo
-	volatile readout_data_raw_t _currentBurstData;
-	displacement_t *_nextCapture;
-	volatile displacement_t _capturedDisplacement;
-	volatile position_t _lastPosition = {0, 0};
-	volatile elapsedMicros _captureTime; //todo
+	adns_time_t _acquisitionStartTime;
+	uint32_t _startTimeMicrosOffset;
+	volatile adns_sample_t _currentSample;
+	// // volatile adns_time_t _sampleCaptureTime;
+	// // volatile adns_raw_readout_t _currentReadout;
+	volatile position_t _currentPosition = {0, 0};
 };
 
 //==================================================================================
