@@ -1,0 +1,32 @@
+{
+	"onDidClearBookmarkEmitter": {},
+	"onDidClearAllBookmarksEmitter": {},
+	"onDidAddBookmarkEmitter": {},
+	"onDidRemoveBookmarkEmitter": {},
+	"onDidUpdateBookmarkEmitter": {},
+	"bookmarks": [
+		{
+			"fsPath": "$ROOTPATH$\\src\\ADNS9800\\adns.h",
+			"bookmarks": [
+				32,
+				41,
+				100,
+				104
+			]
+		},
+		{
+			"fsPath": "$ROOTPATH$\\src\\ADNS9800\\adns.cpp",
+			"bookmarks": [
+				71,
+				77,
+				161
+			]
+		},
+		{
+			"fsPath": "$ROOTPATH$\\src\\ADNS9800\\adns_types.h",
+			"bookmarks": [
+				51
+			]
+		}
+	]
+}

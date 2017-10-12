@@ -5,7 +5,7 @@
   Updated 7/1/2017
 */
 
-#include "adns.h"
+#include "./adns.h"
 #include <Arduino.h>
 #include <stdint.h>
 #include <SPI.h>
@@ -35,50 +35,80 @@ bool ADNS::begin(const uint16_t cpi, const uint16_t hz)
 	return true;
 }
 
-//todo reading
-void ADNS::capture()
+void ADNS::triggerAcquisitionStart()
 {
 	if (!_initializedFlag)
 	{
 		begin();
 	}
+	// todo check if _runningFlag -> stop()
 
-	//TODO check motionSensePin or just read flag
-
-	// Query Motion Register
-	uint8_t motReg = readRegister(RegisterAddress::Motion);
-	_captureTime = elapsedMicros(); //todo
-	_pollCount += 1UL;
-
-	// Update X & Y position and return true if new motion detected
-	if (motReg & 0x80)
-	{
-		_unreadDisplacementLatchedFlag = true;
-		_motionCount += 1UL;
-		return true;
-	}
-	else
-	{
-		_unreadDisplacementLatchedFlag = false;
-		return false;
-	}
+	// Flush Sample Registers -> Write 0 to Motion Register
+	select();
+	SPI.transfer(RegisterAddress::Motion | 0x80);
+	SPI.transfer(0x00);
+	// Reset Start-Time (Time-Origin)
+	setAcquisitionStartTime();
+	// Standard Delays
+	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_WRITE);
+	deselect();
+	delayMicroseconds(ADNS_DELAYMICROS_POST_WRITE);
 }
 
-void ADNS::acquireDisplacement(int16_t &dx, int16_t &dy)
+//==================================================================================
+// Motion Check & Readout
+//==================================================================================
+//todo reading
+void ADNS::triggerSampleCapture()
 {
-	if (!_unreadDisplacementLatchedFlag)
+	// Timestamps
+	adns_time_t sampleStartTime;
+	adns_duration_t sampleDuration;
+
+	// Fetch/Prepare Sample Readout Buffer
+	adns_sample_t &sample = _currentSample;
+	adns_raw_readout_t &raw = sample.readout;
+
+	// Copy Sample-Start-Time from Prior Sample
+	sampleStartTime = sample.startTime + sample.duration;
+
+	// Run Read-Register Sequence with Timestamp Inserted Directly after Address
+	select();
+	SPI.transfer(RegisterAddress::Motion);
+	uint32_t triggerTime = micros();
+	// todo : used elapsedMicros
+	sampleDuration = (sampleStartTime + triggerTime) - (_acquisitionStartTime + _startTimeMicrosOffset);
+
+	delayMicroseconds(ADNS_DELAYMICROS_READ_ADDR_DATA);
+	uint8_t data = SPI.transfer(0);
+	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_READ);
+	deselect();
+	delayMicroseconds(ADNS_DELAYMICROS_POST_READ);
+
+	raw.motion = data & 0x80;
+	_sampleCapturedFlag = true;
+}
+
+void ADNS::triggerSampleReadout()
+{
+	if (!_sampleCapturedFlag)
 	{
-		capture();
+		triggerSampleCapture();
 	}
-	dx = (int16_t)(readRegister(RegisterAddress::Delta_X_L)) | ((int16_t)(readRegister(RegisterAddress::Delta_X_H)) << 8);
-	dy = (int16_t)(readRegister(RegisterAddress::Delta_Y_L)) | ((int16_t)(readRegister(RegisterAddress::Delta_Y_H)) << 8);
-	_unreadDisplacementLatchedFlag = false;
+	adns_raw_readout_t &raw = _currentReadout;
+	raw.dxL = readRegister(RegisterAddress::Delta_X_L);
+	raw.dxH = readRegister(RegisterAddress::Delta_X_H);
+	raw.dyL = readRegister(RegisterAddress::Delta_Y_L);
+	raw.dyH = readRegister(RegisterAddress::Delta_Y_H);
+	// dx = (int16_t)(readRegister(RegisterAddress::Delta_X_L)) | ((int16_t)(readRegister(RegisterAddress::Delta_X_H)) << 8);
+	// dy = (int16_t)(readRegister(RegisterAddress::Delta_Y_L)) | ((int16_t)(readRegister(RegisterAddress::Delta_Y_H)) << 8);
+	_sampleCapturedFlag = false;
 }
 
 //==================================================================================
-//   SENSOR READOUT
+// Burst Motion Check & Readout
 //==================================================================================
-void ADNS::motionBurstRead(readout_data_raw_t &mbRaw)
+void ADNS::motionBurstRead(adns_raw_readout_t &mbRaw)
 {
 	select();
 	latchMotionDataForBurstRead();
@@ -98,13 +128,12 @@ void ADNS::latchMotionDataForBurstRead()
 	select();
 	SPI.transfer(RegisterAddress::Motion_Burst);
 	delayMicroseconds(ADNS_DELAYMICROS_READ_ADDR_DATA);
-	_unreadDisplacementLatchedFlag = true;
-	return true;
+	_sampleCapturedFlag = true;
 }
 
-bool ADNS::readLatchedMotionBurstData(byte *buf, size_t numBytes) //todo: change type to readout_data_raw_t
+bool ADNS::readLatchedMotionBurstData(byte *buf, size_t numBytes) //todo: change type to adns_raw_readout_t
 {
-	if (!(_unreadDisplacementLatchedFlag))
+	if (!(_sampleCapturedFlag))
 		latchMotionDataForBurstRead();
 
 	// byte *motPtr = buf;
@@ -118,9 +147,21 @@ bool ADNS::readLatchedMotionBurstData(byte *buf, size_t numBytes) //todo: change
 		motionDetected = true;
 	}
 
-	// if (_unreadDisplacementLatchedFlag == false)
-	_unreadDisplacementLatchedFlag = false;
+	// if (_sampleCapturedFlag == false)
+	_sampleCapturedFlag = false;
 	return motionDetected;
+}
+
+//==================================================================================
+// Timing & Conversion
+//==================================================================================
+void ADNS::setAcquisitionStartTime(const adns_time_t timeOrigin)
+{
+	_startTimeMicrosOffset = micros();
+	adns_time_t offsetOrigin = timeOrigin + (adns_time_t)_startTimeMicrosOffset;
+	_acquisitionStartTime = timeOrigin;
+	_currentSample.startTime = timeOrigin;
+	_currentSample.duration = 0;
 }
 
 //==================================================================================
@@ -128,7 +169,7 @@ bool ADNS::readLatchedMotionBurstData(byte *buf, size_t numBytes) //todo: change
 //==================================================================================
 void ADNS::select()
 {
-	if (_selectFlag == false)
+	if (_selectedFlag == false)
 	{
 		SPI.beginTransaction(
 			SPISettings(
@@ -136,19 +177,19 @@ void ADNS::select()
 				ADNS_SPI_BIT_ORDER,
 				ADNS_SPI_DATA_MODE));
 		digitalWrite(_chipSelectPin, LOW);
-		_selectFlag = 1;
+		_selectedFlag = 1;
 		delayMicroseconds(1);
 	}
 }
 
 void ADNS::deselect()
 {
-	if (_selectFlag == true)
+	if (_selectedFlag == true)
 	{
 		// delayMicroseconds(1); // tSCLK-NCS
 		digitalWrite(_chipSelectPin, HIGH);
 		SPI.endTransaction();
-		_selectFlag = 0;
+		_selectedFlag = 0;
 	}
 }
 
@@ -286,7 +327,7 @@ void ADNS::initialize()
 		SPI.begin();
 		delay(100);
 	}
-	if (!_sensorConfiguredFlag)
+	if (!_configuredFlag)
 	{
 		// Power-Up Sensor & Set/Confirm Settings on Sensor Device
 		powerUpSensor();
@@ -294,23 +335,11 @@ void ADNS::initialize()
 		setMinSampleRate(_minSampleRate);
 		delaySleepTimeout();
 		setMaxLiftDetectionThreshold();
-		_sensorConfiguredFlag = true;
+		_configuredFlag = true;
 	}
-	resetCounters();
-	//TODO flushMotion Registers
+	_currentPosition.x = 0;
+	_currentPosition.y = 0;
 	_initializedFlag = true;
-}
-
-void ADNS::resetCounters()
-{
-	noInterrupts();
-	_beginMillisCount = millis();
-	_beginMicrosCount = micros();
-	_motionCount = 0;
-	_pollCount = 0;
-	_lastPosition.x = 0;
-	_lastPosition.y = 0;
-	interrupts();
 }
 
 void ADNS::powerUpSensor()
@@ -335,7 +364,7 @@ void ADNS::shutDownSensor()
 {
 	// todo: test
 	writeRegister(RegisterAddress::Shutdown, 0xB6);
-	_sensorConfiguredFlag = false;
+	_configuredFlag = false;
 }
 
 void ADNS::resetSensor()

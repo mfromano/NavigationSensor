@@ -14,6 +14,17 @@
 // Structured Data Storage Typedefs
 //==================================================================================
 
+// mirrors OSC timestamp data-type for High-Resolution Timestamp
+// // typedef struct
+// // {
+// //     uint32_t seconds;
+// //     uint32_t fractionOfSeconds;
+// // } adns_time_t;
+typedef int64_t adns_time_t;
+
+typedef uint32_t adns_duration_t;
+
+// Raw-Readout Array
 typedef union {
     uint8_t data[ADNS_BURST_READ_MAX_BYTES];
     struct
@@ -33,14 +44,14 @@ typedef union {
         uint8_t framePeriodL;
         uint8_t framePeriodH;
     };
-} readout_data_raw_t;
+} adns_raw_readout_t;
 
 // Raw Sample with Timing Information
 typedef struct
 {
-    uint32_t startTime; //TODO seconds and fraction of seconds
-    uint32_t duration;  // microseconds
-    readout_data_raw_t readout;
+    adns_time_t startTime;    //TODO seconds and fraction of seconds
+    adns_duration_t duration; // microseconds
+    adns_raw_readout_t readout;
 } adns_sample_t;
 
 // Position in 'Counts' (real-value dependent on sensor resolution)
@@ -48,7 +59,7 @@ typedef struct
 {
     int32_t x;
     int32_t y;
-} position_t;
+} position_t; //todo
 
 // Displacement <dx,dy> in 'counts' and <dy> in microseconds
 typedef struct
@@ -56,7 +67,7 @@ typedef struct
     int16_t dx;
     int16_t dy;
     uint32_t dt;
-} displacement_t;
+} displacement_t; //todo
 
 typedef struct
 {
@@ -64,7 +75,7 @@ typedef struct
     uint8_t sumH;        // mean = sumH * 512/900  or sumH/1.76
     uint8_t max;
     uint8_t min;
-} pixel_statistics_t;
+} pixel_statistics_t; //todo
 
 typedef struct
 {
