@@ -9,24 +9,21 @@
 #include <Arduino.h>
 #include <stdint.h>
 #include "adns_config.h"
+#include "NavSensorLib\navsensor.h"
 
-//==================================================================================
-// Structured Data Storage Typedefs
-//==================================================================================
+// =============================================================================
+// Structured Data-Storage Typedefs with Internal (ADNS-Specific) Units
+// =============================================================================
 
-// mirrors OSC timestamp data-type for High-Resolution Timestamp
-// // typedef struct
-// // {
-// //     uint32_t seconds;
-// //     uint32_t fractionOfSeconds;
-// // } adns_time_t;
-typedef int64_t adns_time_t;
-
+// Time
+typedef uint32_t adns_time_t;
 typedef uint32_t adns_duration_t;
 
 // Raw-Readout Array
+const size_t adns_readout_max_size = 14; // size in bytes
+typedef uint8_t adns_readout_buffer_t[adns_readout_max_size];
 typedef union {
-    uint8_t data[ADNS_BURST_READ_MAX_BYTES];
+    adns_readout_buffer_t data;
     struct
     {
         uint8_t motion;
@@ -44,49 +41,44 @@ typedef union {
         uint8_t framePeriodL;
         uint8_t framePeriodH;
     };
-} adns_raw_readout_t;
+} adns_readout_t;
 
 // Raw Sample with Timing Information
 typedef struct
 {
-    adns_time_t startTime;    //TODO seconds and fraction of seconds
-    adns_duration_t duration; // microseconds
-    adns_raw_readout_t readout;
+    adns_time_t startTime;  // microseconds
+    adns_time_t endTime;    // microseconds
+    adns_readout_t readout; // byte-array
+} adns_capture_t;
+
+// Position <x,y> in 'Counts' and Elapsed-Time in Microseconds
+typedef struct
+{
+    int32_t x;     // counts
+    int32_t y;     // counts
+    adns_time_t t; // microseconds
+} adns_position_t; //todo change adns_time_t to {sec,nsec}
+
+// Displacement <dx,dy> in 'Counts' and <dy> in Microseconds
+typedef struct
+{
+    int16_t dx;         // counts
+    int16_t dy;         // counts
+    adns_duration_t dt; // microseconds
+} adns_displacement_t;
+
+typedef struct
+{
+    adns_time_t timestamp;
+    adns_displacement_t displacement;
 } adns_sample_t;
-
-// Position in 'Counts' (real-value dependent on sensor resolution)
+//todo add 'seq' or 'index' or 'n' or 'count'
 typedef struct
 {
-    int32_t x;
-    int32_t y;
-} position_t; //todo
-
-// Displacement <dx,dy> in 'counts' and <dy> in microseconds
-typedef struct
-{
-    int16_t dx;
-    int16_t dy;
-    uint32_t dt;
-} displacement_t; //todo
-
-typedef struct
-{
-    uint8_t numFeatures; // actual num-features = numFeatures * 4
-    uint8_t sumH;        // mean = sumH * 512/900  or sumH/1.76
-    uint8_t max;
-    uint8_t min;
+    int32_t numFeatures; // actual num-features = numFeatures * 4
+    int32_t sumH;        // mean = sumH * 512/900  or sumH/1.76
+    int32_t max;
+    int32_t min;
 } pixel_statistics_t; //todo
-
-typedef struct
-{
-    byte b1 : 1;
-    byte b2 : 1;
-    byte b3 : 1;
-    byte b4 : 1;
-    byte b5 : 1;
-    byte b6 : 1;
-    byte b7 : 1;
-    byte b8 : 1;
-} EightBitfield;
 
 #endif
