@@ -98,6 +98,16 @@ class ADNS
 	const int _chipSelectPin;
 	const size_t _readoutSize = adns_readout_max_size;
 	int _motionSensePin;
+
+	// Current Sensor Settings
+	String _firmwareRevision;
+	uint16_t _resolutionCountsPerInch;				// Counts-Per-Inch
+	uint16_t _minSampleRate;						// Hz
+	uint16_t _maxSamplePeriod;						// Microseconds
+	uint16_t _minSamplePeriod;						// Microseconds
+	adns_time_t _acquisitionStartMicrosCountOffset; // Microseconds
+
+	// Unit Conversions
 	typedef struct
 	{
 		Unit::Distance distance = Unit::Distance::MILLIMETER;
@@ -109,14 +119,7 @@ class ADNS
 		dist_time_unit_t displacement;
 		dist_time_unit_t velocity;
 	} _unit;
-
-	// Current Sensor Settings
-	String _firmwareRevision;
-	uint16_t _resolution;							// Counts-Per-Inch
-	uint16_t _minSampleRate;						// Hz
-	uint16_t _maxSamplePeriod;						// Microseconds
-	uint16_t _minSamplePeriod;						// Microseconds
-	adns_time_t _acquisitionStartMicrosCountOffset; // Microseconds
+	float _resolutionInchPerCount;
 
 	// Readout Data
 	adns_capture_t _currentCapture;
