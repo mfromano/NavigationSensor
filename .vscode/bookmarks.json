@@ -6,30 +6,10 @@
 	"onDidUpdateBookmarkEmitter": {},
 	"bookmarks": [
 		{
-			"fsPath": "$ROOTPATH$\\src\\ADNS9800\\adns.h",
-			"bookmarks": [
-				47,
-				39
-			]
-		},
-		{
 			"fsPath": "$ROOTPATH$\\src\\ADNS9800\\adns.cpp",
 			"bookmarks": [
-				8,
-				74,
-				145
-			]
-		},
-		{
-			"fsPath": "$ROOTPATH$\\src\\ADNS9800\\adns_types.h",
-			"bookmarks": [
-				48
-			]
-		},
-		{
-			"fsPath": "$ROOTPATH$\\src\\ADNS9800\\adns_config.h",
-			"bookmarks": [
-				33
+				179,
+				196
 			]
 		}
 	]

@@ -28,34 +28,36 @@ enum class Distance
     YARD,
     MILE
 };
-char *getAbbreviation(Distance unit)
-{
-    switch (unit)
-    {
-    case Distance::NANOMETER:
-        return "nm";
-    case Distance::MICROMETER:
-        return "um";
-    case Distance::MILLIMETER:
-        return "mm";
-    case Distance::CENTIMETER:
-        return "cm";
-    case Distance::METER:
-        return "m";
-    case Distance::KILOMETER:
-        return "km";
-    case Distance::THOU:
-        return "th";
-    case Distance::INCH:
-        return "in";
-    case Distance::FOOT:
-        return "ft";
-    case Distance::YARD:
-        return "yd";
-    case Distance::MILE:
-        return "mi";
-    }
-}
+// // String getAbbreviation(Distance unit)
+// // {
+// //     switch (unit)
+// //     {
+// //     case Distance::NANOMETER:
+// //         return "nm";
+// //     case Distance::MICROMETER:
+// //         return "um";
+// //     case Distance::MILLIMETER:
+// //         return "mm";
+// //     case Distance::CENTIMETER:
+// //         return "cm";
+// //     case Distance::METER:
+// //         return "m";
+// //     case Distance::KILOMETER:
+// //         return "km";
+// //     case Distance::THOU:
+// //         return "th";
+// //     case Distance::INCH:
+// //         return "in";
+// //     case Distance::FOOT:
+// //         return "ft";
+// //     case Distance::YARD:
+// //         return "yd";
+// //     case Distance::MILE:
+// //         return "mi";
+// //     default:
+// //         return "";
+// //     }
+// // }
 
 enum class Time
 {
@@ -66,24 +68,26 @@ enum class Time
     MINUTE,
     HOUR
 };
-char *getAbbreviation(Time unit)
-{
-    switch (unit)
-    {
-    case Time::NANOSECOND:
-        return "ns";
-    case Time::MICROSECOND:
-        return "us";
-    case Time::MILLISECOND:
-        return "ms";
-    case Time::SECOND:
-        return "sec";
-    case Time::MINUTE:
-        return "min";
-    case Time::HOUR:
-        return "hr";
-    }
-}
+// // String getAbbreviation(Time unit)
+// // {
+// //     switch (unit)
+// //     {
+// //     case Time::NANOSECOND:
+// //         return "ns";
+// //     case Time::MICROSECOND:
+// //         return "us";
+// //     case Time::MILLISECOND:
+// //         return "ms";
+// //     case Time::SECOND:
+// //         return "sec";
+// //     case Time::MINUTE:
+// //         return "min";
+// //     case Time::HOUR:
+// //         return "hr";
+// //     default:
+// //         return "";
+// //     }
+// // }
 }
 
 // =============================================================================

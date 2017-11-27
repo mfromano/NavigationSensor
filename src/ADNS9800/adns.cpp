@@ -14,7 +14,7 @@
 // =============================================================================
 bool ADNS::begin(const uint16_t cpi, const uint16_t hz)
 {
-	_resolution = cpi;
+	_resolutionCountsPerInch = cpi;
 	_minSampleRate = hz;
 	initialize();
 	return true;
@@ -177,11 +177,11 @@ displacement_t ADNS::readDisplacement()
 	displacement_t u;
 
 	// Convert Displacement Since Last Read to Velocity Sample
-	const float &cpi = _resolution;			  // counts-per-inch
-	float umPerCnt = 25400.0 / cpi;			  // micrometers-per-count //todo constexpr
-	u.dx = (float)displacement.dx * umPerCnt; // micron
-	u.dy = (float)displacement.dy * umPerCnt; // micron
-	u.dt = (float)displacement.dt;			  // microseconds // todo: standard units
+	const float &ipc = _resolutionInchPerCount; // inches-per-count
+	float umPerCnt = 25400.0 * ipc;				// micrometers-per-count //todo constexpr
+	u.dx = (float)displacement.dx * umPerCnt;   // micron
+	u.dy = (float)displacement.dy * umPerCnt;   // micron
+	u.dt = (float)displacement.dt;				// microseconds // todo: standard units
 	return u;
 }
 
@@ -194,11 +194,11 @@ position_t ADNS::readPosition()
 	position_t p;
 
 	// Convert Displacement Since Last Read to Velocity Sample
-	const float &cpi = _resolution;		// counts-per-inch
-	float mmPerCnt = 25.4 / cpi;		// millimeters-per-count //todo constant conversion when resolution set
-	p.x = (float)position.x * mmPerCnt; // millimeters
-	p.y = (float)position.y * mmPerCnt; // millimeters
-	p.t = position.t;					// microseconds // todo: standard units
+	const float &ipc = _resolutionInchPerCount; // inches-per-count
+	float mmPerCnt = 25.4 * ipc;				// millimeters-per-count //todo constant conversion when resolution set
+	p.x = (float)position.x * mmPerCnt;			// millimeters
+	p.y = (float)position.y * mmPerCnt;			// millimeters
+	p.t = position.t;							// microseconds // todo: standard units
 	return p;
 }
 
@@ -209,18 +209,14 @@ velocity_t ADNS::readVelocity()
 
 	// Initialize sample return structure
 	velocity_t v;
-	float dx, dy; //todo displacement_t p;
 
 	// Convert Displacement Since Last Read to Velocity Sample
-	const float cpi = _resolution;						 // counts-per-inch
-	const float dtInverse = 1000000.0 / displacement.dt; // 1/second
-	// // float cmPerCntSec = (2.54 * 1000000.0) / (cpi * displacement.dt);
-	// // v.x = displacement.dx * cmPerCntSec;
-	// // v.y = displacement.dy * cmPerCntSec;
-	dx = (displacement.dx / cpi) * 2.54; // centimeters
-	dy = (displacement.dy / cpi) * 2.54; // centimeters
-	v.x = dx * dtInverse;				 // cm/second
-	v.y = dy * dtInverse;				 // cm/second
+	const float &ipc = _resolutionInchPerCount; // inches-per-count
+
+	float cmPerCntSec = (2.54 * ipc * 1000000.0f) / ((float)displacement.dt);
+	v.x = (float)displacement.dx * cmPerCntSec; // centimeters
+	v.y = (float)displacement.dy * cmPerCntSec; // centimeters
+
 	return v;
 }
 
@@ -411,7 +407,8 @@ uint16_t ADNS::getResolution()
 	uint8_t data = readRegister(RegisterAddress::Configuration_I);
 	data = data & mask;
 	uint16_t cpi = (uint16_t)data * (uint16_t)ADNS_RESOLUTION_MIN_CPI;
-	_resolution = cpi;
+	_resolutionCountsPerInch = cpi;
+	_resolutionInchPerCount = 1.0f / (float)cpi;
 	return cpi;
 }
 
@@ -521,7 +518,7 @@ void ADNS::initialize()
 	{
 		// Power-Up Sensor & Set/Confirm Settings on Sensor Device
 		powerUpSensor();
-		setResolution(_resolution);
+		setResolution(_resolutionCountsPerInch);
 		setMinSampleRate(_minSampleRate);
 		getMinSamplePeriod(); // todo update period and resolution in single fcn
 		delaySleepTimeout();

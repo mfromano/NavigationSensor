@@ -6,7 +6,7 @@
             "request": "launch",
             "cwd": "${workspaceRoot}",
             "name": "PlatformIO Debugger",
-            "target": "z:/Files/code/microcontroller/NavigationSensor/.pioenvs/uno/firmware.elf",
+            "target": "Z:/Files/code/microcontroller/NavigationSensor/.pioenvs/uno/firmware.elf",
             "gdbpath": "C:/Python27/Scripts/piodebuggdb",
             "autorun": [ "source .pioinit" ]
         }
