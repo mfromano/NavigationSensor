@@ -42,9 +42,9 @@ class ADNS
 	void triggerAcquisitionStop();
 
 	// Convert & Return Captured Data
-	displacement_t readDisplacement(const unit_specification_t = ADNS::getUnits()) const;
-	position_t readPosition(const unit_specification_t = ADNS::getUnits()) const;
-	velocity_t readVelocity(const unit_specification_t = ADNS::getUnits()) const;
+	displacement_t readDisplacement(const unit_specification_t = DEFAULT_UNIT) const;
+	position_t readPosition(const unit_specification_t = DEFAULT_UNIT) const;
+	velocity_t readVelocity(const unit_specification_t = DEFAULT_UNIT) const;
 	void printLast();
 
 	// Sensor Communication (SPI)
@@ -70,12 +70,12 @@ class ADNS
 	// todo mode: accumulate or buffer, rising? falling?
 
 	// Unit Settings for read___() functions
-	static void setDistanceUnit(const Unit::Distance unit) { ADNS::_unitSpec.distance = unit; };
-	static void setTimeUnit(const Unit::Time unit) { ADNS::_unitSpec.time = unit; };
-	static void setUnits(const unit_specification_t unitSpec) { ADNS::_unitSpec = unitSpec; };
-	static inline Unit::Distance getDistanceUnit() { return ADNS::_unitSpec.distance; };
-	static inline Unit::Time getTimeUnit() { return ADNS::_unitSpec.time; };
-	static inline unit_specification_t getUnits() { return ADNS::_unitSpec; };
+	void setDistanceUnit(const Unit::Distance unit) { _unitSpec.distance = unit; };
+	void setTimeUnit(const Unit::Time unit) { _unitSpec.time = unit; };
+	void setUnits(const unit_specification_t unitSpec) { _unitSpec = unitSpec; };
+	inline Unit::Distance getDistanceUnit() { return _unitSpec.distance; };
+	inline Unit::Time getTimeUnit() { return _unitSpec.time; };
+	inline unit_specification_t getUnits() { return _unitSpec; };
 
   protected:
 	// Configuration
@@ -109,8 +109,8 @@ class ADNS
 	adns_time_t _acquisitionStartMicrosCountOffset; // Microseconds
 
 	// Unit Conversions
-	float _resolutionInchPerCount;	
-	static unit_specification_t _unitSpec = DEFAULT_UNIT;
+	float _resolutionInchPerCount;
+	unit_specification_t _unitSpec = DEFAULT_UNIT;
 
 	// Readout Data
 	adns_capture_t _currentCapture;
