@@ -168,7 +168,9 @@ void ADNS::triggerAcquisitionStop() { _runningFlag = false; }
 // =============================================================================
 // Data-Sample Conversion & Access
 // =============================================================================
-displacement_t ADNS::readDisplacement()
+displacement_t ADNS::readDisplacement(
+	Unit::Distance distanceUnit,
+	Unit::Time timeUnit)
 {
 	// Retrieve last displacement sample
 	const adns_displacement_t &displacement = _lastSample.displacement;
@@ -177,15 +179,21 @@ displacement_t ADNS::readDisplacement()
 	displacement_t u;
 
 	// Convert Displacement Since Last Read to Velocity Sample
-	const float &ipc = _resolutionInchPerCount; // inches-per-count
-	float umPerCnt = 25400.0 * ipc;				// micrometers-per-count //todo constexpr
-	u.dx = (float)displacement.dx * umPerCnt;   // micron
-	u.dy = (float)displacement.dy * umPerCnt;   // micron
-	u.dt = (float)displacement.dt;				// microseconds // todo: standard units
+	// // const float &inPerCnt = _resolutionInchPerCount; // inches-per-count
+	// // float umPerCnt = 25400.0 * inPerCnt;			 // micrometers-per-count
+	const float distancePerCount = Unit::perInch(distanceUnit) * _resolutionInchPerCount;
+	const float timePerCount = Unit::perMicrosecond(timeUnit);
+
+	// Apply Conversion Coefficient
+	u.dx = (float)displacement.dx * distancePerCount;
+	u.dy = (float)displacement.dy * distancePerCount;
+	u.dt = (float)displacement.dt * timePerCount;
 	return u;
 }
 
-position_t ADNS::readPosition()
+position_t ADNS::readPosition(
+	Unit::Distance distanceUnit,
+	Unit::Time timeUnit)
 {
 	// Retrieve last displacement sample
 	const adns_position_t &position = _currentPosition;
@@ -193,16 +201,22 @@ position_t ADNS::readPosition()
 	// Initialize sample return structure
 	position_t p;
 
-	// Convert Displacement Since Last Read to Velocity Sample
-	const float &ipc = _resolutionInchPerCount; // inches-per-count
-	float mmPerCnt = 25.4 * ipc;				// millimeters-per-count //todo constant conversion when resolution set
-	p.x = (float)position.x * mmPerCnt;			// millimeters
-	p.y = (float)position.y * mmPerCnt;			// millimeters
-	p.t = position.t;							// microseconds // todo: standard units
+	// // // Convert Displacement Since Last Read to Velocity Sample
+	// // const float &inPerCnt = _resolutionInchPerCount; // inches-per-count
+	// // float mmPerCnt = 25.4 * inPerCnt;				 // millimeters-per-count
+	const float distancePerCount = Unit::perInch(distanceUnit) * _resolutionInchPerCount;
+	const float timePerCount = Unit::perMicrosecond(timeUnit);
+
+	// Apply Conversion Coefficient
+	p.x = (float)position.x * distancePerCount;
+	p.y = (float)position.y * distancePerCount;
+	p.t = position.t * timePerCount;
 	return p;
 }
 
-velocity_t ADNS::readVelocity()
+velocity_t ADNS::readVelocity(
+	Unit::Distance distanceUnit,
+	Unit::Time timeUnit)
 {
 	// Retrieve last displacement sample
 	const adns_displacement_t &displacement = _lastSample.displacement;
@@ -211,12 +225,16 @@ velocity_t ADNS::readVelocity()
 	velocity_t v;
 
 	// Convert Displacement Since Last Read to Velocity Sample
-	const float &ipc = _resolutionInchPerCount; // inches-per-count
+	// // const float &inPerCnt = _resolutionInchPerCount; // inches-per-count
+	// // float cmPerCntSec = (2.54 * inPerCnt * 1000000.0f) / ((float)displacement.dt);
+	const float distancePerCount = Unit::perInch(distanceUnit) * _resolutionInchPerCount;
+	const float timePerCount = Unit::perMicrosecond(timeUnit);
 
-	float cmPerCntSec = (2.54 * ipc * 1000000.0f) / ((float)displacement.dt);
-	v.x = (float)displacement.dx * cmPerCntSec; // centimeters
-	v.y = (float)displacement.dy * cmPerCntSec; // centimeters
+	const float distancePerTimeInterval = distancePerCount * 1 / (timePerCount * (float)displacement.dt);
 
+	// Apply Conversion Coefficient
+	v.x = (float)displacement.dx * distancePerTimeInterval;
+	v.y = (float)displacement.dy * distancePerTimeInterval;
 	return v;
 }
 
@@ -292,38 +310,6 @@ void ADNS::printLast()
 	// // Serial.print("\tvelocity: ");
 	// // Serial.println(t.velocity);
 }
-
-// =============================================================================
-// Output Unit
-// =============================================================================
-void ADNS::setDisplacementUnits(Unit::Distance distance, Unit::Time time)
-{
-	ADNS::dist_time_unit_t &unit = _unit.displacement;
-	unit.distance = distance;
-	unit.time = time;
-}
-void ADNS::setPositionUnits(Unit::Distance distance, Unit::Time time)
-{
-	ADNS::dist_time_unit_t &unit = _unit.position;
-	unit.distance = distance;
-	unit.time = time;
-}
-void ADNS::setVelocityUnits(Unit::Distance distance, Unit::Time time)
-{
-	ADNS::dist_time_unit_t &unit = _unit.velocity;
-	unit.distance = distance;
-	unit.time = time;
-}
-
-// // void ADNS::setDistanceUnit(Unit::Distance unit)
-// // {
-// // 	_unit.distance = unit;
-// // }
-
-// // void ADNS::setTimeUnit(Unit::Time unit)
-// // {
-// // 	_unit.time = unit;
-// // }
 
 // =============================================================================
 // Sensor Communication (SPI)
