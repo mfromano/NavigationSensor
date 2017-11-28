@@ -15,7 +15,7 @@
 bool ADNS::begin(const uint16_t cpi, const uint16_t hz)
 {
 	_resolutionCountsPerInch = cpi;
-	_minSampleRate = hz;
+	_maxSamplePeriodUs = (uint16_t)(1000000UL / (uint32_t)hz);
 	initialize();
 	return true;
 }
@@ -90,7 +90,7 @@ void ADNS::triggerSampleCapture()
 	// Read Latched Data from Sensor Registers
 	if (ADNS::_burstModeFlag)
 	{
-		while (getMicrosElapse(capture.endTime, micros()) < _minSamplePeriod)
+		while (getMicrosElapse(capture.endTime, micros()) < _minSamplePeriodUs)
 		{
 		};
 		for (uint8_t k = 0; k < adns_readout_max_size; k++)
@@ -283,6 +283,104 @@ void ADNS::printLast()
 }
 
 // =============================================================================
+// Sensor Settings
+// =============================================================================
+void ADNS::setResolutionCountsPerInch(const uint16_t cpi)
+{
+	// Input may take any value between 50 and 8200 (will be rounded to nearest 50
+	// cpi)
+	uint16_t cpiValid =
+		constrain(cpi, ADNS_RESOLUTION_MIN_CPI, ADNS_RESOLUTION_MAX_CPI);
+	// uint8_t data = readRegister(RegisterAddress::Configuration_I);
+	// Keep current values from reserved bits (0x3f = B00111111) note: data sheet
+	// has error, mask is 0xFF uint8_t mask = ADNS_RESOLUTION_REGISTER_MASK; data
+	// = (data & ~mask) | (((uint8_t)(cpi / (uint16_t)ADNS_RESOLUTION_MIN_CPI)) &
+	// mask);
+	uint8_t data = (uint8_t)(cpiValid / (uint16_t)ADNS_RESOLUTION_MIN_CPI);
+	writeRegister(RegisterAddress::Configuration_I, data);
+	// Read back resolution from same register to confirm and store in cached
+	// property
+	getResolutionCountsPerInch(); // todo: check resolution matches assigned resolution ->
+								  // report
+}
+
+uint16_t ADNS::getResolutionCountsPerInch()
+{
+	uint8_t mask = ADNS_RESOLUTION_REGISTER_MASK;
+	uint8_t data = readRegister(RegisterAddress::Configuration_I);
+	data = data & mask;
+	uint16_t cpi = (uint16_t)data * (uint16_t)ADNS_RESOLUTION_MIN_CPI;
+	_resolutionCountsPerInch = cpi;
+	_resolutionInchPerCount = 1.0f / (float)cpi;
+	return cpi;
+}
+
+void ADNS::setMaxSamplePeriodUs(const uint16_t us)
+{
+	/* Configures sensor hardware -> sets the maximum frame period (minimum frame
+  rate) that can be selected by the automatic frame rate control, OR the actual
+  frame rate if the sensor is placed in manual frame rate control mode
+  */
+	uint8_t dataL, dataH;
+	uint16_t delayNumCyles = us * ADNS_CHIP_FREQ_MHZ;
+	dataL = lowByte(delayNumCyles);
+	dataH = highByte(delayNumCyles);
+	writeRegister(RegisterAddress::Frame_Period_Max_Bound_Lower, dataL);
+	writeRegister(RegisterAddress::Frame_Period_Max_Bound_Upper, dataH);
+	getMaxSamplePeriodUs();
+}
+
+uint16_t ADNS::getMaxSamplePeriodUs()
+{
+	uint8_t dataL, dataH;
+	dataH = readRegister(RegisterAddress::Frame_Period_Max_Bound_Upper);
+	dataL = readRegister(RegisterAddress::Frame_Period_Max_Bound_Lower);
+	uint16_t us = makeWord(dataH, dataL) / ADNS_CHIP_FREQ_MHZ;
+	_maxSamplePeriodUs = us;
+	return us;
+}
+
+void ADNS::setMinSamplePeriodUs(const uint16_t us)
+{
+	// todo ensure frameperiod_maxbound >= frameperiod_minbound + shutter_maxbound
+	uint8_t dataL, dataH;
+	uint16_t delayNumCyles = us * ADNS_CHIP_FREQ_MHZ;
+	dataL = lowByte(delayNumCyles);
+	dataH = highByte(delayNumCyles);
+	writeRegister(RegisterAddress::Frame_Period_Min_Bound_Lower, dataL);
+	writeRegister(RegisterAddress::Frame_Period_Min_Bound_Upper, dataH);
+	getMinSamplePeriodUs();
+}
+
+uint16_t ADNS::getMinSamplePeriodUs()
+{
+	uint8_t dataL, dataH;
+	dataH = readRegister(RegisterAddress::Frame_Period_Min_Bound_Upper);
+	dataL = readRegister(RegisterAddress::Frame_Period_Min_Bound_Lower);
+	uint16_t us = makeWord(dataH, dataL) / ADNS_CHIP_FREQ_MHZ;
+	_minSamplePeriodUs = us;
+	return us;
+}
+
+// =============================================================================
+// Sensor Status
+// =============================================================================
+uint16_t ADNS::getSamplePeriodUs()
+{
+	uint8_t dataL, dataH;
+	dataH = readRegister(RegisterAddress::Frame_Period_Upper);
+	dataL = readRegister(RegisterAddress::Frame_Period_Lower);
+	uint16_t us = makeWord(dataH, dataL) / ADNS_CHIP_FREQ_MHZ;
+	return us;
+}
+
+uint16_t ADNS::getSampleRate()
+{
+	uint16_t us = getSamplePeriodUs();
+	return (uint16_t)(1000000UL / (uint32_t)us);
+}
+
+// =============================================================================
 // Sensor Communication (SPI)
 // =============================================================================
 void ADNS::select()
@@ -337,118 +435,6 @@ void ADNS::writeRegister(const RegisterAddress address, const uint8_t data)
 }
 
 // =============================================================================
-// Sensor Settings
-// =============================================================================
-void ADNS::setResolution(const uint16_t cpi)
-{
-	// Input may take any value between 50 and 8200 (will be rounded to nearest 50
-	// cpi)
-	uint16_t cpiValid =
-		constrain(cpi, ADNS_RESOLUTION_MIN_CPI, ADNS_RESOLUTION_MAX_CPI);
-	// uint8_t data = readRegister(RegisterAddress::Configuration_I);
-	// Keep current values from reserved bits (0x3f = B00111111) note: data sheet
-	// has error, mask is 0xFF uint8_t mask = ADNS_RESOLUTION_REGISTER_MASK; data
-	// = (data & ~mask) | (((uint8_t)(cpi / (uint16_t)ADNS_RESOLUTION_MIN_CPI)) &
-	// mask);
-	uint8_t data = (uint8_t)(cpiValid / (uint16_t)ADNS_RESOLUTION_MIN_CPI);
-	writeRegister(RegisterAddress::Configuration_I, data);
-	// Read back resolution from same register to confirm and store in cached
-	// property
-	getResolution(); // todo: check resolution matches assigned resolution ->
-					 // report
-}
-
-uint16_t ADNS::getResolution()
-{
-	uint8_t mask = ADNS_RESOLUTION_REGISTER_MASK;
-	uint8_t data = readRegister(RegisterAddress::Configuration_I);
-	data = data & mask;
-	uint16_t cpi = (uint16_t)data * (uint16_t)ADNS_RESOLUTION_MIN_CPI;
-	_resolutionCountsPerInch = cpi;
-	_resolutionInchPerCount = 1.0f / (float)cpi;
-	return cpi;
-}
-
-void ADNS::setMaxSamplePeriod(const uint16_t us)
-{
-	/* Configures sensor hardware -> sets the maximum frame period (minimum frame
-  rate) that can be selected by the automatic frame rate control, OR the actual
-  frame rate if the sensor is placed in manual frame rate control mode
-  */
-	uint8_t dataL, dataH;
-	uint16_t delayNumCyles = us * ADNS_CHIP_FREQ_MHZ;
-	dataL = lowByte(delayNumCyles);
-	dataH = highByte(delayNumCyles);
-	writeRegister(RegisterAddress::Frame_Period_Max_Bound_Lower, dataL);
-	writeRegister(RegisterAddress::Frame_Period_Max_Bound_Upper, dataH);
-	getMaxSamplePeriod();
-}
-
-uint16_t ADNS::getMaxSamplePeriod()
-{
-	uint8_t dataL, dataH;
-	dataH = readRegister(RegisterAddress::Frame_Period_Max_Bound_Upper);
-	dataL = readRegister(RegisterAddress::Frame_Period_Max_Bound_Lower);
-	uint16_t us = makeWord(dataH, dataL) / ADNS_CHIP_FREQ_MHZ;
-	_maxSamplePeriod = us;
-	return us;
-}
-
-void ADNS::setMinSamplePeriod(const uint16_t us)
-{
-	// todo ensure frameperiod_maxbound >= frameperiod_minbound + shutter_maxbound
-	uint8_t dataL, dataH;
-	uint16_t delayNumCyles = us * ADNS_CHIP_FREQ_MHZ;
-	dataL = lowByte(delayNumCyles);
-	dataH = highByte(delayNumCyles);
-	writeRegister(RegisterAddress::Frame_Period_Min_Bound_Lower, dataL);
-	writeRegister(RegisterAddress::Frame_Period_Min_Bound_Upper, dataH);
-	getMinSamplePeriod();
-}
-
-uint16_t ADNS::getMinSamplePeriod()
-{
-	uint8_t dataL, dataH;
-	dataH = readRegister(RegisterAddress::Frame_Period_Min_Bound_Upper);
-	dataL = readRegister(RegisterAddress::Frame_Period_Min_Bound_Lower);
-	uint16_t us = makeWord(dataH, dataL) / ADNS_CHIP_FREQ_MHZ;
-	_minSamplePeriod = us;
-	return us;
-}
-
-void ADNS::setMinSampleRate(const uint16_t hz)
-{
-	// Convenience function to call inverse function and pass to
-	// setMaxSamplePeriod()
-	uint16_t us = (uint16_t)(1000000UL / (uint32_t)hz);
-	setMaxSamplePeriod(us);
-	getMinSampleRate();
-}
-
-uint16_t ADNS::getMinSampleRate()
-{
-	uint16_t us = getMaxSamplePeriod();
-	uint16_t hz = (uint16_t)(1000000UL / (uint32_t)us);
-	_minSampleRate = hz;
-	return hz;
-}
-
-uint16_t ADNS::getSamplePeriod()
-{
-	uint8_t dataL, dataH;
-	dataH = readRegister(RegisterAddress::Frame_Period_Upper);
-	dataL = readRegister(RegisterAddress::Frame_Period_Lower);
-	uint16_t us = makeWord(dataH, dataL) / ADNS_CHIP_FREQ_MHZ;
-	return us;
-}
-
-uint16_t ADNS::getSampleRate()
-{
-	uint16_t us = getSamplePeriod();
-	return (uint16_t)(1000000UL / (uint32_t)us);
-}
-
-// =============================================================================
 // Mode
 // =============================================================================
 void ADNS::setMotionSensePinInterruptMode(const int pin)
@@ -476,9 +462,9 @@ void ADNS::initialize()
 	{
 		// Power-Up Sensor & Set/Confirm Settings on Sensor Device
 		powerUpSensor();
-		setResolution(_resolutionCountsPerInch);
-		setMinSampleRate(_minSampleRate);
-		getMinSamplePeriod(); // todo update period and resolution in single fcn
+		setResolutionCountsPerInch(_resolutionCountsPerInch);
+		setMaxSamplePeriodUs(_maxSamplePeriodUs);
+		getMinSamplePeriodUs(); // todo update period and resolution in single fcn
 		delaySleepTimeout();
 		setMaxLiftDetectionThreshold();
 		_configuredFlag = true;
@@ -523,7 +509,7 @@ void ADNS::resetSensor()
 	writeRegister(RegisterAddress::Power_Up_Reset, 0x5a);
 	delay(50);
 	writeRegister(RegisterAddress::Observation, 0x00);
-	delayMicroseconds(max(2000, _maxSamplePeriod));
+	delayMicroseconds(max(2000, _maxSamplePeriodUs));
 	// uint8_t obs = readRegister(RegisterAddress::Observation);
 	// should then check bits 0:5 are set
 	readRegister(RegisterAddress::Motion);
