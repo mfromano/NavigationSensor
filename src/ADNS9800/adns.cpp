@@ -234,26 +234,7 @@ velocity_t ADNS::readVelocity(const unit_specification_t unit) const
 
 void ADNS::printLast()
 {
-	// // struct
-	// // {
-	// // 	uint32_t capture;
-	// // 	uint32_t update;
-	// // 	uint32_t velocity;
-	// // } t;
-	// // elapsedMicros elap(0);
-
-	// // triggerSampleCapture();
-	// // t.capture = elap;
-	// // elap = 0;
-	// // if (!_autoUpdateFlag)
-	// // {
-	// // 	triggerPositionUpdate();
-	// // 	t.update = elap;
-	// // 	elap = 0;
-	// // }
-	// // velocity_t v = readVelocity();
-	// // t.velocity = elap;
-
+	
 	triggerSampleCapture();
 	if (!_autoUpdateFlag)
 	{
@@ -286,7 +267,7 @@ void ADNS::printLast()
 	Serial.println(">\t");
 
 	// Print Position
-	Serial.print("<x,y,t> [mm,mm,us]:\t<");
+	Serial.print("<x,y,t> [" + xyUnit + "," + xyUnit + "," + tUnit + "]\t<");
 	Serial.print(p.x);
 	Serial.print(",");
 	Serial.print(p.y);
@@ -295,19 +276,12 @@ void ADNS::printLast()
 	Serial.println(">\t");
 
 	// Print Velocity
-	Serial.print("<Vx,Vy> [cm/s]:\t<");
+	Serial.print("<Vx,Vy> [" + xyUnit + "/" + tUnit + "," + xyUnit +"/"+tUnit+ "]\t<");
 	Serial.print(v.x);
 	Serial.print(",");
 	Serial.print(v.y);
 	Serial.println(">\t");
 
-	// // // Print Elapsed Time //todo remove
-	// // Serial.print("\tcapture: ");
-	// // Serial.print(t.capture);
-	// // Serial.print("\tupdate: ");
-	// // Serial.print(t.update);
-	// // Serial.print("\tvelocity: ");
-	// // Serial.println(t.velocity);
 }
 
 // =============================================================================

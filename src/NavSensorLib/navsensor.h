@@ -165,10 +165,10 @@ inline const String getAbbreviation(const Time unit)
 }
 typedef struct
 {
-    Unit::Distance distance = DEFAULT_DISTANCE_UNIT;
-    Unit::Time time = DEFAULT_TIME_UNIT;
+    Unit::Distance distance;
+    Unit::Time time;
 } unit_specification_t;
-const unit_specification_t DEFAULT_UNIT(DEFAULT_DISTANCE_UNIT, DEFAULT_TIME_UNIT);
+static constexpr unit_specification_t DEFAULT_UNIT = {DEFAULT_DISTANCE_UNIT, DEFAULT_TIME_UNIT};
 
 // =============================================================================
 // High-Precision Time & Timestamping Typedefs
