@@ -39,12 +39,11 @@ void ADNS::triggerAcquisitionStart()
 
 	// Set Start-Time Microsecond Offset
 	adns_time_t us = micros();
-	adns_capture_t &sample = _currentCapture;
-	sample.startTime = 0;
-	sample.endTime = 0;
-	sample.readout.motion = 0x00;
+	adns_capture_t &capture = _currentCapture;
+	capture.startTime = 0;
+	capture.endTime = 0; // todo
+	capture.readout.motion = 0x00;
 	_acquisitionStartMicrosCountOffset = us;
-	// // _lastSampleMicrosCount = us;
 
 	// Standard Delays
 	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_WRITE);
@@ -234,7 +233,7 @@ velocity_t ADNS::readVelocity(const unit_specification_t unit) const
 
 void ADNS::printLast()
 {
-	
+
 	triggerSampleCapture();
 	if (!_autoUpdateFlag)
 	{
@@ -276,12 +275,11 @@ void ADNS::printLast()
 	Serial.println(">\t");
 
 	// Print Velocity
-	Serial.print("<Vx,Vy> [" + xyUnit + "/" + tUnit + "," + xyUnit +"/"+tUnit+ "]\t<");
+	Serial.print("<Vx,Vy> [" + xyUnit + "/" + tUnit + "," + xyUnit + "/" + tUnit + "]\t<");
 	Serial.print(v.x);
 	Serial.print(",");
 	Serial.print(v.y);
 	Serial.println(">\t");
-
 }
 
 // =============================================================================
@@ -456,9 +454,10 @@ uint16_t ADNS::getSampleRate()
 void ADNS::setMotionSensePinInterruptMode(const int pin)
 {
 	_motionSensePin = pin;
-	// todo: attach interrupt to motion-sense pin
-	// pinMode(pin, INPUTPULLUP);
-	// attachInterrupt(digitalPinToInterrupt(pin), (*)(update), LOW)
+	// todo: set flag and use timer to poll if using this mode??
+	pinMode(pin, INPUTPULLUP);
+	attachInterrupt(digitalPinToInterrupt(pin), (*)(triggerSampleCapture), LOW);
+	SPI.usingInterrupt(digitalPinToInterrupt(pin));
 }
 
 // =============================================================================
