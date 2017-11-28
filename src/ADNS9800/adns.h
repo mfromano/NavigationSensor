@@ -47,23 +47,24 @@ class ADNS
 	velocity_t readVelocity(const unit_specification_t = DEFAULT_UNIT) const;
 	void printLast();
 
+
+	// Sensor Settings
+	void setResolutionCountsPerInch(const uint16_t cpi);
+	uint16_t getResolutionCountsPerInch();
+	void setMaxSamplePeriodUs(const uint16_t us);
+	uint16_t getMaxSamplePeriodUs();
+	void setMinSamplePeriodUs(const uint16_t us);
+	uint16_t getMinSamplePeriodUs();
+
+	// Sensor Status
+	uint16_t getSamplePeriodUs();
+	uint16_t getSampleRate();
+	
 	// Sensor Communication (SPI)
 	void select();
 	void deselect();
 	uint8_t readRegister(const RegisterAddress address);
 	void writeRegister(const RegisterAddress address, const uint8_t data);
-
-	// Sensor Settings
-	void setResolution(const uint16_t cpi);
-	uint16_t getResolution();
-	void setMaxSamplePeriod(const uint16_t us);
-	uint16_t getMaxSamplePeriod();
-	void setMinSamplePeriod(const uint16_t us);
-	uint16_t getMinSamplePeriod();
-	void setMinSampleRate(const uint16_t hz);
-	uint16_t getMinSampleRate();
-	uint16_t getSamplePeriod();
-	uint16_t getSampleRate();
 
 	// Mode Settings
 	void setMotionSensePinInterruptMode(const int pin);
@@ -103,9 +104,8 @@ class ADNS
 	// Current Sensor Settings
 	String _firmwareRevision;
 	uint16_t _resolutionCountsPerInch;				// Counts-Per-Inch
-	uint16_t _minSampleRate;						// Hz
-	uint16_t _maxSamplePeriod;						// Microseconds
-	uint16_t _minSamplePeriod;						// Microseconds
+	uint16_t _maxSamplePeriodUs;					// Microseconds
+	uint16_t _minSamplePeriodUs;					// Microseconds
 	adns_time_t _acquisitionStartMicrosCountOffset; // Microseconds
 
 	// Unit Conversions
