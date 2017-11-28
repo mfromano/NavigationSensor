@@ -14,6 +14,8 @@
 // =============================================================================
 #define DEFAULT_DISTANCE_UNIT Unit::Distance::MILLIMETER
 #define DEFAULT_TIME_UNIT Unit::Time::MILLISECOND
+
+// // typedef unit_specification_t;
 namespace Unit
 {
 enum class Distance
@@ -70,7 +72,7 @@ enum class Time
     MINUTE,
     HOUR
 };
-inline const float perSecond(const Time unit)
+inline const float perSecond(const Time unit) //todo remove const output?
 {
     switch (unit)
     {
@@ -110,57 +112,63 @@ inline const float perMicrosecond(const Time unit)
         return 1.0;
     }
 }
-// // String getAbbreviation(Distance unit)
-// // {
-// //     switch (unit)
-// //     {
-// //     case Distance::NANOMETER:
-// //         return "nm";
-// //     case Distance::MICROMETER:
-// //         return "um";
-// //     case Distance::MILLIMETER:
-// //         return "mm";
-// //     case Distance::CENTIMETER:
-// //         return "cm";
-// //     case Distance::METER:
-// //         return "m";
-// //     case Distance::KILOMETER:
-// //         return "km";
-// //     case Distance::THOU:
-// //         return "th";
-// //     case Distance::INCH:
-// //         return "in";
-// //     case Distance::FOOT:
-// //         return "ft";
-// //     case Distance::YARD:
-// //         return "yd";
-// //     case Distance::MILE:
-// //         return "mi";
-// //     default:
-// //         return "";
-// //     }
-// // }
-// // String getAbbreviation(Time unit)
-// // {
-// //     switch (unit)
-// //     {
-// //     case Time::NANOSECOND:
-// //         return "ns";
-// //     case Time::MICROSECOND:
-// //         return "us";
-// //     case Time::MILLISECOND:
-// //         return "ms";
-// //     case Time::SECOND:
-// //         return "sec";
-// //     case Time::MINUTE:
-// //         return "min";
-// //     case Time::HOUR:
-// //         return "hr";
-// //     default:
-// //         return "";
-// //     }
-// // }
+inline const String getAbbreviation(const Distance unit)
+{
+    switch (unit)
+    {
+    case Distance::NANOMETER:
+        return "nm";
+    case Distance::MICROMETER:
+        return "um";
+    case Distance::MILLIMETER:
+        return "mm";
+    case Distance::CENTIMETER:
+        return "cm";
+    case Distance::METER:
+        return "m";
+    case Distance::KILOMETER:
+        return "km";
+    case Distance::THOU:
+        return "th";
+    case Distance::INCH:
+        return "in";
+    case Distance::FOOT:
+        return "ft";
+    case Distance::YARD:
+        return "yd";
+    case Distance::MILE:
+        return "mi";
+    default:
+        return "";
+    }
 }
+inline const String getAbbreviation(const Time unit)
+{
+    switch (unit)
+    {
+    case Time::NANOSECOND:
+        return "ns";
+    case Time::MICROSECOND:
+        return "us";
+    case Time::MILLISECOND:
+        return "ms";
+    case Time::SECOND:
+        return "sec";
+    case Time::MINUTE:
+        return "min";
+    case Time::HOUR:
+        return "hr";
+    default:
+        return "";
+    }
+}
+}
+typedef struct
+{
+    Unit::Distance distance = DEFAULT_DISTANCE_UNIT;
+    Unit::Time time = DEFAULT_TIME_UNIT;
+} unit_specification_t;
+const unit_specification_t DEFAULT_UNIT(DEFAULT_DISTANCE_UNIT, DEFAULT_TIME_UNIT);
 
 // =============================================================================
 // High-Precision Time & Timestamping Typedefs
