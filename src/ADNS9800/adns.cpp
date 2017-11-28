@@ -9,6 +9,11 @@
 #include <elapsedMillis.h>
 #include <digitalWriteFast.h>
 
+#define DELAY_450NS asm volatile("nop")
+#define DELAY_1uS \
+	DELAY_450NS;  \
+	DELAY_450NS;
+
 // =============================================================================
 //   Setup
 // =============================================================================
@@ -93,11 +98,10 @@ void ADNS::triggerSampleCapture()
 		while (getMicrosElapse(capture.endTime, micros()) < _minSamplePeriodUs)
 		{
 		};
-		// // for (uint8_t k = 0; k < adns_readout_max_size; k++)
-		// // {
-		// // 	readout.data[k] = SPI.transfer(0x00);
-		// // }
 		SPI.transfer(readout.data, adns_readout_max_size);
+
+		// Release SPI Bus
+		deselect();
 	}
 	else
 	{
@@ -125,9 +129,6 @@ void ADNS::triggerSampleCapture()
 			readout.dyH = 0x00;
 		}
 	}
-
-	// Release SPI Bus
-	deselect();
 
 	// Update Displacement
 	displacement.dx += ((int16_t)(readout.dxL) | ((int16_t)(readout.dxH) << 8));
@@ -168,6 +169,7 @@ void ADNS::triggerAcquisitionStop() { _runningFlag = false; }
 // =============================================================================
 // Data-Sample Conversion & Access
 // =============================================================================
+//todo: homogenize and combine these functions
 displacement_t ADNS::readDisplacement(const unit_specification_t unit) const
 {
 	// Retrieve last displacement sample
@@ -176,9 +178,7 @@ displacement_t ADNS::readDisplacement(const unit_specification_t unit) const
 	// Initialize sample return structure
 	displacement_t u;
 
-	// Convert Displacement Since Last Read to Velocity Sample
-	// // const float &inPerCnt = _resolutionInchPerCount; // inches-per-count
-	// // float umPerCnt = 25400.0 * inPerCnt;			 // micrometers-per-count
+	// Pre-Compute Conversion Coefficients for Efficiency
 	const float distancePerCount = Unit::perInch(unit.distance) * _resolutionInchPerCount;
 	const float timePerCount = Unit::perMicrosecond(unit.time);
 
@@ -197,9 +197,7 @@ position_t ADNS::readPosition(const unit_specification_t unit) const
 	// Initialize sample return structure
 	position_t p;
 
-	// // // Convert Displacement Since Last Read to Velocity Sample
-	// // const float &inPerCnt = _resolutionInchPerCount; // inches-per-count
-	// // float mmPerCnt = 25.4 * inPerCnt;				 // millimeters-per-count
+	// Pre-Compute Conversion Coefficients for Efficiency
 	const float distancePerCount = Unit::perInch(unit.distance) * _resolutionInchPerCount;
 	const float timePerCount = Unit::perMicrosecond(unit.time);
 
@@ -218,12 +216,9 @@ velocity_t ADNS::readVelocity(const unit_specification_t unit) const
 	// Initialize sample return structure
 	velocity_t v;
 
-	// Convert Displacement Since Last Read to Velocity Sample
-	// // const float &inPerCnt = _resolutionInchPerCount; // inches-per-count
-	// // float cmPerCntSec = (2.54 * inPerCnt * 1000000.0f) / ((float)displacement.dt);
+	// Pre-Compute Conversion Coefficients for Efficiency
 	const float distancePerCount = Unit::perInch(unit.distance) * _resolutionInchPerCount;
 	const float timePerCount = Unit::perMicrosecond(unit.time);
-
 	const float distancePerTimeInterval = distancePerCount * 1 / (timePerCount * (float)displacement.dt);
 
 	// Apply Conversion Coefficient
@@ -584,27 +579,4 @@ void ADNS::setMaxLiftDetectionThreshold()
 	data = (data & ~ADNS_LIFT_DETECTION_REGISTER_MASK) |
 		   (0xFF & ADNS_LIFT_DETECTION_REGISTER_MASK);
 	writeRegister(RegisterAddress::Lift_Detection_Thr, data);
-}
-
-// =============================================================================
-// Inline Convenience Functions
-// =============================================================================
-int16_t reg2Int16(uint8_t bL, uint8_t bH)
-{
-	int16_t iw16 = (int16_t)makeWord(bH, bL);
-	return convertTwosComplement(iw16);
-};
-int16_t convertTwosComplement(int16_t b)
-{
-	// Convert from 16-BIT 2's complement
-	if (b & 0x8000)
-	{
-		b = -1 * ((b ^ 0xffff) + 1);
-	}
-	return b;
-};
-adns_duration_t getMicrosElapse(adns_time_t t1, adns_time_t t2)
-{
-	adns_duration_t dt = t1 > t2 ? 1 + t1 + ~t2 : t2 - t1;
-	return dt;
 }

@@ -40,13 +40,13 @@ class ADNS
 	void triggerSampleCapture();
 	void triggerPositionUpdate();
 	void triggerAcquisitionStop();
+	//todo -> inline static void these for responsiveness from ISRs
 
 	// Convert & Return Captured Data
 	displacement_t readDisplacement(const unit_specification_t = DEFAULT_UNIT) const;
 	position_t readPosition(const unit_specification_t = DEFAULT_UNIT) const;
 	velocity_t readVelocity(const unit_specification_t = DEFAULT_UNIT) const;
 	void printLast();
-
 
 	// Sensor Settings
 	void setResolutionCountsPerInch(const uint16_t cpi);
@@ -59,7 +59,7 @@ class ADNS
 	// Sensor Status
 	uint16_t getSamplePeriodUs();
 	uint16_t getSampleRateHz();
-	
+
 	// Sensor Communication (SPI)
 	void select();
 	void deselect();
@@ -132,20 +132,5 @@ class ADNS
 	static const bool _autoUpdateFlag = false;
 #endif
 };
-
-// =============================================================================
-// Inline Convenience Functions
-// =============================================================================
-inline int16_t reg2Int16(uint8_t, uint8_t);
-inline int16_t convertTwosComplement(int16_t b);
-inline uint32_t getMicrosElapse(uint32_t t1, uint32_t t2);
-
-// ADAFRUIT_SENSOR UNIFIED
-// bool getEvent(sensors_event_t *event)
-// void getSensor(sensor_t *sensor)
-// enable
-// disable
-// void displaySensorDetails(void)
-// void configureSensor(void)
 
 #endif

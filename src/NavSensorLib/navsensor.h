@@ -8,12 +8,27 @@
 
 #include <Arduino.h>
 #include <stdint.h>
+#include "timing.h"
+
+#if defined(ARDUINO_ARCH_ESP8266) | defined(ARDUINO_ESP8266_ESP01)
+#elif defined(__AVR__)
+#elif defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__) || defined(__AVR_ATtiny25__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny85__) || defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega328_) || defined(__AVR_ATmega128__)
+#elif defined(ESP8266) || defined(ESP32)
+#elif defined(ARDUINO_ESP8266_NODEMCU) || defined(ARDUINO_ESP8266_WEMOS_D1MINI)
+#elif defined(CORE_TEENSY)
+#if defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MKL26Z64__) || defined(__MK66FX1M0__)
+// Teensy 3.0  3.1 (PIC32's might have some day) 3.1LC 3.2 3.5
+//todo add teensy support // #include <TeensyDelay.h>
+#endif
+#endif
 
 // =============================================================================
 // Unit Enumerations
 // =============================================================================
 #define DEFAULT_DISTANCE_UNIT Unit::Distance::MILLIMETER
 #define DEFAULT_TIME_UNIT Unit::Time::MILLISECOND
+
+#define ARRAY_SIZE(a) sizeof(a) / sizeof(a[0])
 
 // // typedef unit_specification_t;
 namespace Unit
@@ -169,19 +184,6 @@ typedef struct
     Unit::Time time;
 } unit_specification_t;
 static constexpr unit_specification_t DEFAULT_UNIT = {DEFAULT_DISTANCE_UNIT, DEFAULT_TIME_UNIT};
-
-// =============================================================================
-// High-Precision Time & Timestamping Typedefs
-// =============================================================================
-
-// OSC timestamp data-type for High-Resolution Timestamp
-typedef struct
-{
-    uint32_t seconds;
-    uint32_t fractionOfSeconds;
-} osc_time_t;
-
-typedef uint32_t time_t; // todo time_t
 
 // =============================================================================
 // Data-Sample Template Structures
@@ -412,3 +414,11 @@ typedef struct
 //     return *this;
 //   }
 // }
+
+// ADAFRUIT_SENSOR UNIFIED
+// bool getEvent(sensors_event_t *event)
+// void getSensor(sensor_t *sensor)
+// enable
+// disable
+// void displaySensorDetails(void)
+// void configureSensor(void)
