@@ -42,15 +42,9 @@ class ADNS
 	void triggerAcquisitionStop();
 
 	// Convert & Return Captured Data
-	displacement_t readDisplacement(
-		Unit::Distance = DEFAULT_DISTANCE_UNIT,
-		Unit::Time = DEFAULT_TIME_UNIT);
-	position_t readPosition(
-		Unit::Distance = DEFAULT_DISTANCE_UNIT,
-		Unit::Time = DEFAULT_TIME_UNIT);
-	velocity_t readVelocity(
-		Unit::Distance = DEFAULT_DISTANCE_UNIT,
-		Unit::Time = DEFAULT_TIME_UNIT);
+	displacement_t readDisplacement(const unit_specification_t = ADNS::getUnits()) const;
+	position_t readPosition(const unit_specification_t = ADNS::getUnits()) const;
+	velocity_t readVelocity(const unit_specification_t = ADNS::getUnits()) const;
 	void printLast();
 
 	// Sensor Communication (SPI)
@@ -74,6 +68,14 @@ class ADNS
 	// Mode Settings
 	void setMotionSensePinInterruptMode(const int pin);
 	// todo mode: accumulate or buffer, rising? falling?
+
+	// Unit Settings for read___() functions
+	static void setDistanceUnit(const Unit::Distance unit) { ADNS::_unitSpec.distance = unit; };
+	static void setTimeUnit(const Unit::Time unit) { ADNS::_unitSpec.time = unit; };
+	static void setUnits(const unit_specification_t unitSpec) { ADNS::_unitSpec = unitSpec; };
+	static inline Unit::Distance getDistanceUnit() { return ADNS::_unitSpec.distance; };
+	static inline Unit::Time getTimeUnit() { return ADNS::_unitSpec.time; };
+	static inline unit_specification_t getUnits() { return ADNS::_unitSpec; };
 
   protected:
 	// Configuration
@@ -107,19 +109,8 @@ class ADNS
 	adns_time_t _acquisitionStartMicrosCountOffset; // Microseconds
 
 	// Unit Conversions
-	typedef struct
-	{
-		Unit::Distance distance = Unit::Distance::MILLIMETER;
-		Unit::Time time = Unit::Time::MILLISECOND;
-	} dist_time_unit_t;
-	struct
-	{
-		dist_time_unit_t position;
-		dist_time_unit_t displacement;
-		dist_time_unit_t velocity;
-	} _unit;
-	float _resolutionInchPerCount;
-	
+	float _resolutionInchPerCount;	
+	static unit_specification_t _unitSpec = DEFAULT_UNIT;
 
 	// Readout Data
 	adns_capture_t _currentCapture;
