@@ -42,17 +42,16 @@ class ADNS
 	void triggerAcquisitionStop();
 
 	// Convert & Return Captured Data
-	displacement_t readDisplacement();
-	position_t readPosition();
-	velocity_t readVelocity();
+	displacement_t readDisplacement(
+		Unit::Distance = DEFAULT_DISTANCE_UNIT,
+		Unit::Time = DEFAULT_TIME_UNIT);
+	position_t readPosition(
+		Unit::Distance = DEFAULT_DISTANCE_UNIT,
+		Unit::Time = DEFAULT_TIME_UNIT);
+	velocity_t readVelocity(
+		Unit::Distance = DEFAULT_DISTANCE_UNIT,
+		Unit::Time = DEFAULT_TIME_UNIT);
 	void printLast();
-
-	// Units
-	void setDisplacementUnits(Unit::Distance, Unit::Time = Unit::Time::MILLISECOND);
-	void setPositionUnits(Unit::Distance, Unit::Time = Unit::Time::MILLISECOND);
-	void setVelocityUnits(Unit::Distance, Unit::Time = Unit::Time::MILLISECOND);
-	// // void setDistanceUnit(Unit::Distance);
-	// // void setTimeUnit(Unit::Time);
 
 	// Sensor Communication (SPI)
 	void select();
@@ -120,6 +119,7 @@ class ADNS
 		dist_time_unit_t velocity;
 	} _unit;
 	float _resolutionInchPerCount;
+	
 
 	// Readout Data
 	adns_capture_t _currentCapture;
