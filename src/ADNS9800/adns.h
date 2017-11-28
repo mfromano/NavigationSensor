@@ -58,7 +58,7 @@ class ADNS
 
 	// Sensor Status
 	uint16_t getSamplePeriodUs();
-	uint16_t getSampleRate();
+	uint16_t getSampleRateHz();
 	
 	// Sensor Communication (SPI)
 	void select();

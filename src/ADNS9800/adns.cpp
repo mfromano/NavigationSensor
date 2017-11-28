@@ -93,10 +93,11 @@ void ADNS::triggerSampleCapture()
 		while (getMicrosElapse(capture.endTime, micros()) < _minSamplePeriodUs)
 		{
 		};
-		for (uint8_t k = 0; k < adns_readout_max_size; k++)
-		{
-			readout.data[k] = SPI.transfer(0x00);
-		}
+		// // for (uint8_t k = 0; k < adns_readout_max_size; k++)
+		// // {
+		// // 	readout.data[k] = SPI.transfer(0x00);
+		// // }
+		SPI.transfer(readout.data, adns_readout_max_size);
 	}
 	else
 	{
@@ -374,7 +375,7 @@ uint16_t ADNS::getSamplePeriodUs()
 	return us;
 }
 
-uint16_t ADNS::getSampleRate()
+uint16_t ADNS::getSampleRateHz()
 {
 	uint16_t us = getSamplePeriodUs();
 	return (uint16_t)(1000000UL / (uint32_t)us);
@@ -441,9 +442,10 @@ void ADNS::setMotionSensePinInterruptMode(const int pin)
 {
 	_motionSensePin = pin;
 	// todo: set flag and use timer to poll if using this mode??
-	pinMode(pin, INPUTPULLUP);
-	attachInterrupt(digitalPinToInterrupt(pin), (*)(triggerSampleCapture), LOW);
-	SPI.usingInterrupt(digitalPinToInterrupt(pin));
+	// pinModeFast(pin, INPUT_PULLUP);
+	// attachInterrupt(digitalPinToInterrupt(pin), triggerSampleCapture, LOW);
+	// todo: interrupt requires a static member function
+	// SPI.usingInterrupt(digitalPinToInterrupt(pin));
 }
 
 // =============================================================================
