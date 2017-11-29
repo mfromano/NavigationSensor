@@ -10,17 +10,19 @@
 #include <stdint.h>
 #include "timing.h"
 
-#if defined(ARDUINO_ARCH_ESP8266) | defined(ARDUINO_ESP8266_ESP01)
-#elif defined(__AVR__)
-#elif defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__) || defined(__AVR_ATtiny25__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny85__) || defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega328_) || defined(__AVR_ATmega128__)
-#elif defined(ESP8266) || defined(ESP32)
-#elif defined(ARDUINO_ESP8266_NODEMCU) || defined(ARDUINO_ESP8266_WEMOS_D1MINI)
-#elif defined(CORE_TEENSY)
-#if defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MKL26Z64__) || defined(__MK66FX1M0__)
-// Teensy 3.0  3.1 (PIC32's might have some day) 3.1LC 3.2 3.5
-//todo add teensy support // #include <TeensyDelay.h>
-#endif
-#endif
+// // #if defined(ARDUINO_ARCH_ESP8266) | defined(ARDUINO_ESP8266_ESP01)
+// // #elif defined(__AVR__)
+// // #elif defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__) || defined(__AVR_ATtiny25__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny85__) || defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega328_) || defined(__AVR_ATmega128__)
+// // #elif defined(ESP8266) || defined(ESP32)
+// // #elif defined(ARDUINO_ESP8266_NODEMCU) || defined(ARDUINO_ESP8266_WEMOS_D1MINI)
+// // #elif defined(CORE_TEENSY)
+// // #elif defined(__arm__) && defined(TEENSYDUINO)
+// // #if defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MKL26Z64__) || defined(__MK66FX1M0__)
+// // // Teensy 3.1 -> __MK20DX256__
+// // // Teensy 3.0  3.1 (PIC32's might have some day) 3.1LC 3.2 3.5
+// // //todo add teensy support // #include <TeensyDelay.h>
+// // #endif
+// // #endif
 
 // =============================================================================
 // Unit Enumerations

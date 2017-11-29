@@ -3,6 +3,7 @@
   main.cpp
 
 */
+#include <glcd_delay.h>
 
 // Arduino Includes
 #include <Arduino.h>
