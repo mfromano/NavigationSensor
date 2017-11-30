@@ -14,6 +14,7 @@
 #endif
 #include <SPI.h>
 #include <stdint.h>
+#include <elapsedMillis.h>
 
 // Sensor Register Include - ADNS-9800
 #include "adns_config.h"
@@ -113,9 +114,9 @@ class ADNS
 	// // unit_specification_t _unitSpec = DEFAULT_UNIT;
 
 	// Readout Data
-	adns_capture_t _currentCapture;
-	adns_displacement_t _currentDisplacement;
 	adns_position_t _currentPosition;
+	adns_capture_t _currentCapture;
+	adns_sample_t _currentSample;
 	adns_sample_t _lastSample; //todo use CircularBuffer, push, implement available()
 };
 
