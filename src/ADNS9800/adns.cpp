@@ -84,60 +84,63 @@ void ADNS::triggerSampleCapture()
 	// Run Read-Register Sequence with Timestamp Inserted Directly after Address
 	select();
 
-	// Read from Motion or Motion_Burst Address to Latch Data
-	SPI.transfer(ADNS::_motionLatchRegAddr & 0x7f);
+// Read from Motion or Motion_Burst Address to Latch Data
+#if (ADNS_READMODE_BURST)
+	static const byte MOTION_LATCH_ADDR = (byte)RegisterAddress::Motion_Burst;
+#else
+	static const byte MOTION_LATCH_ADDR = (byte)RegisterAddress::Motion_Burst;
+#endif
+	SPI.transfer(MOTION_LATCH_ADDR & 0x7f);
 
 	// Record Sample Finish-Time
 	usFinish = micros();
 	dt = getMicrosElapse(usStart, usFinish);
 	capture.endTime = capture.startTime + dt;
 
-	// Read Latched Data from Sensor Registers
-	if (ADNS::_burstModeFlag)
-	{
-		while (getMicrosElapse(capture.endTime, micros()) < _minSamplePeriodUs)
-		{
-		};
-		SPI.transfer(readout.data, adns_readout_max_size);
+// Read Latched Data from Sensor Registers
+#if (ADNS_READMODE_BURST)
 
-		// Release SPI Bus
-		deselect();
+	while (getMicrosElapse(capture.endTime, micros()) < _minSamplePeriodUs)
+	{
+	};
+	SPI.transfer(readout.data, adns_readout_max_size);
+
+	// Release SPI Bus
+	deselect();
+#else
+	// Read Motion-Register
+	delayMicroseconds(ADNS_DELAYMICROS_READ_ADDR_DATA);
+	uint8_t motion = SPI.transfer(0);
+	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_READ);
+	deselect();
+	delayMicroseconds(ADNS_DELAYMICROS_POST_READ);
+
+	// Update Current Sample Displacement Register Values
+	readout.motion = motion;
+	if (bit_is_set(motion, 7))
+	{
+		readout.dxL = readRegister(RegisterAddress::Delta_X_L);
+		readout.dxH = readRegister(RegisterAddress::Delta_X_H);
+		readout.dyL = readRegister(RegisterAddress::Delta_Y_L);
+		readout.dyH = readRegister(RegisterAddress::Delta_Y_H);
 	}
 	else
 	{
-		// Read Motion-Register
-		delayMicroseconds(ADNS_DELAYMICROS_READ_ADDR_DATA);
-		uint8_t motion = SPI.transfer(0);
-		delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_READ);
-		deselect();
-		delayMicroseconds(ADNS_DELAYMICROS_POST_READ);
-
-		// Update Current Sample Displacement Register Values
-		readout.motion = motion;
-		if (bit_is_set(motion, 7))
-		{
-			readout.dxL = readRegister(RegisterAddress::Delta_X_L);
-			readout.dxH = readRegister(RegisterAddress::Delta_X_H);
-			readout.dyL = readRegister(RegisterAddress::Delta_Y_L);
-			readout.dyH = readRegister(RegisterAddress::Delta_Y_H);
-		}
-		else
-		{
-			readout.dxL = 0x00;
-			readout.dxH = 0x00;
-			readout.dyL = 0x00;
-			readout.dyH = 0x00;
-		}
+		readout.dxL = 0x00;
+		readout.dxH = 0x00;
+		readout.dyL = 0x00;
+		readout.dyH = 0x00;
 	}
+#endif
 
 	// Update Displacement
 	displacement.dx += ((int16_t)(readout.dxL) | ((int16_t)(readout.dxH) << 8));
 	displacement.dy += ((int16_t)(readout.dyL) | ((int16_t)(readout.dyH) << 8));
 	displacement.dt += ((capture.endTime - capture.startTime));
 
-	if (_autoUpdateFlag)
-		triggerPositionUpdate();
-
+#if (ADNS_POSITIONUPDATE_AUTOMATIC)
+	triggerPositionUpdate();
+#endif
 	// todo interrupts();
 }
 
@@ -229,52 +232,61 @@ velocity_t ADNS::readVelocity(const unit_specification_t unit) const
 
 void ADNS::printLast()
 {
-
+	// Trigger Capture (and position update)
 	triggerSampleCapture();
-	if (!_autoUpdateFlag)
-	{
-		triggerPositionUpdate();
-	}
-	displacement_t u = readDisplacement();
-	position_t p = readPosition();
-	velocity_t v = readVelocity();
-
+#if (!ADNS_POSITIONUPDATE_AUTOMATIC)
+	triggerPositionUpdate();
+#endif
+	// Ensure Serial Stream has Started
 	if (!Serial)
 	{
 		Serial.begin(115200);
 		delay(50);
 	}
 	// Print Timestamp of Last Sample
+	Serial.print("\ntimestamp [us]:\t");
 	Serial.println(_lastSample.timestamp);
 
-	const unit_specification_t unitType = ADNS::getUnits();
-	const String xyUnit = Unit::getAbbreviation(unitType.distance);
-	const String tUnit = Unit::getAbbreviation(unitType.time);
+	// Initialize Unit-Specification and Description Variables
+	unit_specification_t unitType;
+	String xyUnit;
+	String tUnit;
 
 	// Print Displacement
-	// // Serial.print("<dx,dy,dt> [um,um,us]:\t<");
+	unitType = {Unit::Distance::MICROMETER, Unit::Time::MICROSECOND};
+	xyUnit = Unit::getAbbreviation(unitType.distance);
+	tUnit = Unit::getAbbreviation(unitType.time);
+	displacement_t u = readDisplacement(unitType);
 	Serial.print("<dx,dy,dt> [" + xyUnit + "," + xyUnit + "," + tUnit + "]\t<");
-	Serial.print(u.dx);
+	Serial.print(u.dx, 3);
 	Serial.print(",");
-	Serial.print(u.dy);
+	Serial.print(u.dy, 3);
 	Serial.print(",");
 	Serial.print(u.dt);
 	Serial.println(">\t");
 
 	// Print Position
+	unitType = {Unit::Distance::MILLIMETER, Unit::Time::MILLISECOND};
+	xyUnit = Unit::getAbbreviation(unitType.distance);
+	tUnit = Unit::getAbbreviation(unitType.time);
+	position_t p = readPosition(unitType);
 	Serial.print("<x,y,t> [" + xyUnit + "," + xyUnit + "," + tUnit + "]\t<");
-	Serial.print(p.x);
+	Serial.print(p.x, 3);
 	Serial.print(",");
-	Serial.print(p.y);
+	Serial.print(p.y, 3);
 	Serial.print(",");
 	Serial.print(p.t);
 	Serial.println(">\t");
 
 	// Print Velocity
+	unitType = {Unit::Distance::METER, Unit::Time::SECOND};
+	xyUnit = Unit::getAbbreviation(unitType.distance);
+	tUnit = Unit::getAbbreviation(unitType.time);
+	velocity_t v = readVelocity(unitType);
 	Serial.print("<Vx,Vy> [" + xyUnit + "/" + tUnit + "," + xyUnit + "/" + tUnit + "]\t<");
-	Serial.print(v.x);
+	Serial.print(v.x, 3);
 	Serial.print(",");
-	Serial.print(v.y);
+	Serial.print(v.y, 3);
 	Serial.println(">\t");
 }
 

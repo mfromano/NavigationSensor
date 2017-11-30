@@ -70,13 +70,13 @@ class ADNS
 	void setMotionSensePinInterruptMode(const int pin);
 	// todo mode: accumulate or buffer, rising? falling?
 
-	// Unit Settings for read___() functions
-	void setDistanceUnit(const Unit::Distance unit) { _unitSpec.distance = unit; };
-	void setTimeUnit(const Unit::Time unit) { _unitSpec.time = unit; };
-	void setUnits(const unit_specification_t unitSpec) { _unitSpec = unitSpec; };
-	inline Unit::Distance getDistanceUnit() { return _unitSpec.distance; };
-	inline Unit::Time getTimeUnit() { return _unitSpec.time; };
-	inline unit_specification_t getUnits() { return _unitSpec; };
+	// // // Unit Settings for read___() functions
+	// // void setDistanceUnit(const Unit::Distance unit) { _unitSpec.distance = unit; };
+	// // void setTimeUnit(const Unit::Time unit) { _unitSpec.time = unit; };
+	// // void setUnits(const unit_specification_t unitSpec) { _unitSpec = unitSpec; };
+	// // inline Unit::Distance getDistanceUnit() { return _unitSpec.distance; };
+	// // inline Unit::Time getTimeUnit() { return _unitSpec.time; };
+	// // inline unit_specification_t getUnits() { return _unitSpec; };
 
   protected:
 	// Configuration
@@ -110,27 +110,13 @@ class ADNS
 
 	// Unit Conversions
 	float _resolutionInchPerCount;
-	unit_specification_t _unitSpec = DEFAULT_UNIT;
+	// // unit_specification_t _unitSpec = DEFAULT_UNIT;
 
 	// Readout Data
 	adns_capture_t _currentCapture;
 	adns_displacement_t _currentDisplacement;
 	adns_position_t _currentPosition;
 	adns_sample_t _lastSample; //todo use CircularBuffer, push, implement available()
-
-// Static Settings
-#ifdef ADNS_READMODE_BURST
-	static const uint8_t _motionLatchRegAddr = (uint8_t)RegisterAddress::Motion_Burst;
-	static const bool _burstModeFlag = ADNS_READMODE_BURST;
-#else
-	static const uint8_t _motionLatchRegAddr = (uint8_t)RegisterAddress::Motion;
-	static const bool _burstModeFlag = false;
-#endif
-#ifdef ADNS_POSITIONUPDATE_AUTOMATIC
-	static const bool _autoUpdateFlag = ADNS_POSITIONUPDATE_AUTOMATIC;
-#else
-	static const bool _autoUpdateFlag = false;
-#endif
 };
 
 #endif
