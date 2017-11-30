@@ -32,7 +32,6 @@
 
 // Modes
 #define ADNS_READMODE_BURST 1
-#define ADNS_POSITIONUPDATE_AUTOMATIC 1
 
 // SPI Communication Timing
 #define ADNS_DELAYMICROS_POST_READ 20

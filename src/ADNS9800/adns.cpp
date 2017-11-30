@@ -41,19 +41,22 @@ void ADNS::triggerAcquisitionStart()
 	SPI.transfer((uint8_t)RegisterAddress::Motion | 0x80);
 	SPI.transfer(0x00);
 
-	// Reset Current Position
-	_currentPosition.x = 0;
-	_currentPosition.y = 0;
-	_currentPosition.t = 0;
-
 	// Set Start-Time Microsecond Offset
-	adns_time_t us = micros();
-	adns_capture_t &capture = _currentCapture;
-	capture.startTime = 0;
-	capture.readout.motion = 0x00;
-	_acquisitionStartMicrosCountOffset = us;
+	_microsSinceStart = 0;
+	_microsSinceCapture = _microsSinceStart;
 
-	// Standard Delays
+	// Reset Current Position
+	_position.x = 0;
+	_position.y = 0;
+	_position.t = 0;
+
+	// Reset Current Raw-Readout & Sample Buffers with Fresh Data
+	static adns_readout_t freshReadout;
+	static adns_sample_t freshSample;
+	_readout = freshReadout;
+	_sample = freshSample;
+
+	// Standard Post-Transfer Delays
 	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_WRITE);
 	deselect();
 	delayMicroseconds(ADNS_DELAYMICROS_POST_WRITE);
@@ -62,50 +65,34 @@ void ADNS::triggerAcquisitionStart()
 	_runningFlag = true;
 }
 
-// Read from ADNS9800 Sensor and Update _currentCapture & _currentSample
+// Read from ADNS9800 Sensor and Update _currentCapture & _sample
 void ADNS::triggerSampleCapture()
 {
 	// Trigger Start if Not Running
 	if (!_runningFlag)
 		triggerAcquisitionStart();
 
-	// Timestamps
-	adns_time_t usStart, usFinish;
-	adns_duration_t dt;
-
-	// Get Local References to Current Data Structures
-	adns_capture_t &capture = _currentCapture;
-	adns_readout_t &readout = capture.readout;
-	adns_sample_t &sample = _currentSample;
-	adns_displacement_t &displacement = sample.displacement;
-
-	// Copy Start-Time from Prior Sample Finish-Time
-	capture.startTime = capture.endTime;
-	usStart = capture.startTime + _acquisitionStartMicrosCountOffset;
-
-	// Run Read-Register Sequence with Timestamp Inserted Directly after Address
+	noInterrupts(); // new
 	select();
 
 // Read from Motion or Motion_Burst Address to Latch Data
 #if (ADNS_READMODE_BURST)
 	static const byte MOTION_LATCH_ADDR = (byte)RegisterAddress::Motion_Burst;
 #else
-	static const byte MOTION_LATCH_ADDR = (byte)RegisterAddress::Motion_Burst;
+	static const byte MOTION_LATCH_ADDR = (byte)RegisterAddress::Motion;
 #endif
 	SPI.transfer(MOTION_LATCH_ADDR & 0x7f);
 
-	// Record Sample Finish-Time
-	usFinish = micros(); // todo replace with elapsedMicros or sec,nsec
-	dt = getMicrosElapse(usStart, usFinish);
-	capture.endTime = capture.startTime + dt;
+	// Latch Elapsed Microseconds at End Of Sample
+	uint32_t dtLatch = _microsSinceCapture;
 
 // Read Latched Data from Sensor Registers
 #if (ADNS_READMODE_BURST)
 
-	while (getMicrosElapse(capture.endTime, micros()) < _minSamplePeriodUs)
+	while ((_microsSinceCapture - dtLatch) < _minSamplePeriodUs)
 	{
 	};
-	SPI.transfer(readout.data, adns_readout_max_size);
+	SPI.transfer(_readout.data, adns_readout_max_size);
 
 	// Release SPI Bus
 	deselect();
@@ -118,53 +105,38 @@ void ADNS::triggerSampleCapture()
 	delayMicroseconds(ADNS_DELAYMICROS_POST_READ);
 
 	// Update Current Sample Displacement Register Values
-	readout.motion = motion;
+	_readout.motion = motion;
 	if (bit_is_set(motion, 7))
 	{
-		readout.dxL = readRegister(RegisterAddress::Delta_X_L);
-		readout.dxH = readRegister(RegisterAddress::Delta_X_H);
-		readout.dyL = readRegister(RegisterAddress::Delta_Y_L);
-		readout.dyH = readRegister(RegisterAddress::Delta_Y_H);
+		_readout.dxL = readRegister(RegisterAddress::Delta_X_L);
+		_readout.dxH = readRegister(RegisterAddress::Delta_X_H);
+		_readout.dyL = readRegister(RegisterAddress::Delta_Y_L);
+		_readout.dyH = readRegister(RegisterAddress::Delta_Y_H);
 	}
 	else
 	{
-		readout.dxL = 0x00;
-		readout.dxH = 0x00;
-		readout.dyL = 0x00;
-		readout.dyH = 0x00;
+		_readout.dxL = 0x00;
+		_readout.dxH = 0x00;
+		_readout.dyL = 0x00;
+		_readout.dyH = 0x00;
 	}
 #endif
 
 	// Update Displacement
-	displacement.dx += ((int16_t)(readout.dxL) | ((int16_t)(readout.dxH) << 8));
-	displacement.dy += ((int16_t)(readout.dyL) | ((int16_t)(readout.dyH) << 8));
-	displacement.dt += dt; //((capture.endTime - capture.startTime));
+	_sample.displacement.dx = ((int16_t)(_readout.dxL) | ((int16_t)(_readout.dxH) << 8));
+	_sample.displacement.dy = ((int16_t)(_readout.dyL) | ((int16_t)(_readout.dyH) << 8));
+	_sample.displacement.dt = dtLatch; //((capture.endTime - capture.startTime));
 
-#if (ADNS_POSITIONUPDATE_AUTOMATIC)
-	triggerPositionUpdate();
-#endif
-}
-
-// Update _currentPosition and Reset _currentSample
-void ADNS::triggerPositionUpdate()
-{
-	// Local References
-	adns_sample_t &sample = _lastSample;
-	adns_position_t &position = _currentPosition;
-	adns_displacement_t &displacement = _currentSample.displacement;
-
-	// Set Timestamp with prior Position Time
-	noInterrupts();
-	sample.timestamp = position.t;
+	// Update Elapsed-Microsecond-Since-Capture Counter
+	_sample.count++;
+	_sample.timestamp = _microsSinceCapture - _microsSinceStart; // position.t;
+	_microsSinceCapture -= dtLatch;
 
 	// Update Current Position Data
-	position.x += displacement.dx;
-	position.y += displacement.dy;
-	position.t += displacement.dt;
+	_position.x += _sample.displacement.dx;
+	_position.y += _sample.displacement.dy;
+	_position.t += _sample.displacement.dt;
 
-	// Copy & Reset Displacement
-	sample.displacement = displacement;
-	displacement = {0, 0, 0};
 	interrupts();
 }
 
@@ -177,7 +149,7 @@ void ADNS::triggerAcquisitionStop() { _runningFlag = false; }
 displacement_t ADNS::readDisplacement(const unit_specification_t unit) const
 {
 	// Retrieve last displacement sample
-	const adns_displacement_t &displacement = _lastSample.displacement;
+	const adns_displacement_t &displacement = _sample.displacement;
 
 	// Initialize sample return structure
 	displacement_t u;
@@ -196,7 +168,7 @@ displacement_t ADNS::readDisplacement(const unit_specification_t unit) const
 position_t ADNS::readPosition(const unit_specification_t unit) const
 {
 	// Retrieve last displacement sample
-	const adns_position_t &position = _currentPosition;
+	const adns_position_t &position = _position;
 
 	// Initialize sample return structure
 	position_t p;
@@ -215,7 +187,7 @@ position_t ADNS::readPosition(const unit_specification_t unit) const
 velocity_t ADNS::readVelocity(const unit_specification_t unit) const
 {
 	// Retrieve last displacement sample
-	const adns_displacement_t &displacement = _lastSample.displacement;
+	const adns_displacement_t &displacement = _sample.displacement;
 
 	// Initialize sample return structure
 	velocity_t v;
@@ -235,9 +207,7 @@ void ADNS::printLast()
 {
 	// Trigger Capture (and position update)
 	triggerSampleCapture();
-#if (!ADNS_POSITIONUPDATE_AUTOMATIC)
-	triggerPositionUpdate();
-#endif
+
 	// Ensure Serial Stream has Started
 	if (!Serial)
 	{
@@ -246,7 +216,7 @@ void ADNS::printLast()
 	}
 	// Print Timestamp of Last Sample
 	Serial.print("\ntimestamp [us]:\t");
-	Serial.println(_lastSample.timestamp);
+	Serial.println(_sample.timestamp);
 
 	// Initialize Unit-Specification and Description Variables
 	unit_specification_t unitType;

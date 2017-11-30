@@ -104,20 +104,20 @@ class ADNS
 
 	// Current Sensor Settings
 	String _firmwareRevision;
-	uint16_t _resolutionCountsPerInch;				// Counts-Per-Inch
-	uint16_t _maxSamplePeriodUs;					// Microseconds
-	uint16_t _minSamplePeriodUs;					// Microseconds
-	adns_time_t _acquisitionStartMicrosCountOffset; // Microseconds
+	uint16_t _resolutionCountsPerInch; // Counts-Per-Inch
+	uint16_t _maxSamplePeriodUs;	   // Microseconds
+	uint16_t _minSamplePeriodUs;	   // Microseconds
+	elapsedMicros _microsSinceStart;
+	elapsedMicros _microsSinceCapture;
 
 	// Unit Conversions
 	float _resolutionInchPerCount;
 	// // unit_specification_t _unitSpec = DEFAULT_UNIT;
 
 	// Readout Data
-	adns_position_t _currentPosition;
-	adns_capture_t _currentCapture;
-	adns_sample_t _currentSample;
-	adns_sample_t _lastSample; //todo use CircularBuffer, push, implement available()
+	adns_position_t _position;
+	adns_readout_t _readout;
+	adns_sample_t _sample;
 };
 
 #endif

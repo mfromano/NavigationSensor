@@ -51,13 +51,6 @@ typedef union {
     };
 } adns_readout_t;
 
-// Structure with Raw Data and Time of Start
-typedef struct
-{
-    adns_time_t startTime;  // microseconds
-    adns_readout_t readout; // byte-array
-} adns_capture_t;
-
 // Displacement <dx,dy> in 'Counts' and <dy> in Microseconds
 typedef struct
 {
@@ -68,6 +61,7 @@ typedef struct
 
 typedef struct
 {
+    uint32_t count;
     adns_time_t timestamp;
     adns_displacement_t displacement;
 } adns_sample_t;
