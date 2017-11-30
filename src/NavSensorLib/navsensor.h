@@ -10,20 +10,6 @@
 #include <stdint.h>
 #include "timing.h"
 
-// // #if defined(ARDUINO_ARCH_ESP8266) | defined(ARDUINO_ESP8266_ESP01)
-// // #elif defined(__AVR__)
-// // #elif defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__) || defined(__AVR_ATtiny25__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny85__) || defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega328_) || defined(__AVR_ATmega128__)
-// // #elif defined(ESP8266) || defined(ESP32)
-// // #elif defined(ARDUINO_ESP8266_NODEMCU) || defined(ARDUINO_ESP8266_WEMOS_D1MINI)
-// // #elif defined(CORE_TEENSY)
-// // #elif defined(__arm__) && defined(TEENSYDUINO)
-// // #if defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MKL26Z64__) || defined(__MK66FX1M0__)
-// // // Teensy 3.1 -> __MK20DX256__
-// // // Teensy 3.0  3.1 (PIC32's might have some day) 3.1LC 3.2 3.5
-// // //todo add teensy support // #include <TeensyDelay.h>
-// // #endif
-// // #endif
-
 // =============================================================================
 // Unit Enumerations
 // =============================================================================
@@ -49,30 +35,30 @@ enum class Distance
     YARD,
     MILE
 };
-inline const float perInch(const Distance unit)
+inline float perInch(const Distance unit)
 {
     switch (unit)
     {
     case Distance::NANOMETER:
-        return 25400000.000;
+        return 25400000.0;
     case Distance::MICROMETER:
-        return 25400.000000;
+        return 25400.0;
     case Distance::MILLIMETER:
-        return 25.400000000;
+        return 25.4;
     case Distance::CENTIMETER:
-        return 2.5400000000;
+        return 2.54;
     case Distance::METER:
-        return .025400000000;
+        return .0254;
     case Distance::KILOMETER:
-        return .000025400000000;
+        return .0000254;
     case Distance::THOU:
         return 1000.0;
     case Distance::INCH:
         return 1.000;
     case Distance::FOOT:
-        return 0.0833333;
+        return .0833333;
     case Distance::YARD:
-        return 0.0277778;
+        return .0277778;
     case Distance::MILE:
         return 1.5783E-5;
     default:
@@ -89,18 +75,18 @@ enum class Time
     MINUTE,
     HOUR
 };
-inline const float perSecond(const Time unit) //todo remove const output?
+inline float perSecond(const Time unit) //todo remove const output?
 {
     switch (unit)
     {
     case Time::NANOSECOND:
-        return 1000000000.000;
+        return 1000000000.0;
     case Time::MICROSECOND:
-        return 1000000.000000;
+        return 1000000.0;
     case Time::MILLISECOND:
-        return 1000.000000000;
+        return 1000.0;
     case Time::SECOND:
-        return 1.000000000000;
+        return 1.0;
     case Time::MINUTE:
         return 0.0166667;
     case Time::HOUR:
@@ -109,18 +95,18 @@ inline const float perSecond(const Time unit) //todo remove const output?
         return 1000000.0;
     }
 };
-inline const float perMicrosecond(const Time unit)
+inline float perMicrosecond(const Time unit)
 {
     switch (unit)
     {
     case Time::NANOSECOND:
-        return 1000.000000000;
+        return 1000.0;
     case Time::MICROSECOND:
-        return 1.000000000000;
+        return 1.0;
     case Time::MILLISECOND:
-        return 0.001000000000000;
+        return 0.001;
     case Time::SECOND:
-        return 0.000001000000000000;
+        return 0.000001;
     case Time::MINUTE:
         return 0.00000001666666667;
     case Time::HOUR:
@@ -424,3 +410,17 @@ typedef struct
 // disable
 // void displaySensorDetails(void)
 // void configureSensor(void)
+
+// // #if defined(ARDUINO_ARCH_ESP8266) | defined(ARDUINO_ESP8266_ESP01)
+// // #elif defined(__AVR__)
+// // #elif defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__) || defined(__AVR_ATtiny25__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtiny85__) || defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega328_) || defined(__AVR_ATmega128__)
+// // #elif defined(ESP8266) || defined(ESP32)
+// // #elif defined(ARDUINO_ESP8266_NODEMCU) || defined(ARDUINO_ESP8266_WEMOS_D1MINI)
+// // #elif defined(CORE_TEENSY)
+// // #elif defined(__arm__) && defined(TEENSYDUINO)
+// // #if defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MKL26Z64__) || defined(__MK66FX1M0__)
+// // // Teensy 3.1 -> __MK20DX256__
+// // // Teensy 3.0  3.1 (PIC32's might have some day) 3.1LC 3.2 3.5
+// // //todo add teensy support // #include <TeensyDelay.h>
+// // #endif
+// // #endif
