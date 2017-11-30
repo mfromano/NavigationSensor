@@ -6,7 +6,6 @@
 */
 
 #include "adns.h"
-#include <elapsedMillis.h>
 #include <digitalWriteFast.h>
 
 #define DELAY_450NS asm volatile("nop")
@@ -42,11 +41,15 @@ void ADNS::triggerAcquisitionStart()
 	SPI.transfer((uint8_t)RegisterAddress::Motion | 0x80);
 	SPI.transfer(0x00);
 
+	// Reset Current Position
+	_currentPosition.x = 0;
+	_currentPosition.y = 0;
+	_currentPosition.t = 0;
+
 	// Set Start-Time Microsecond Offset
 	adns_time_t us = micros();
 	adns_capture_t &capture = _currentCapture;
 	capture.startTime = 0;
-	capture.endTime = 0; // todo
 	capture.readout.motion = 0x00;
 	_acquisitionStartMicrosCountOffset = us;
 
@@ -59,7 +62,7 @@ void ADNS::triggerAcquisitionStart()
 	_runningFlag = true;
 }
 
-// Read from ADNS9800 Sensor and Update _currentCapture & _currentDisplacement
+// Read from ADNS9800 Sensor and Update _currentCapture & _currentSample
 void ADNS::triggerSampleCapture()
 {
 	// Trigger Start if Not Running
@@ -72,10 +75,9 @@ void ADNS::triggerSampleCapture()
 
 	// Get Local References to Current Data Structures
 	adns_capture_t &capture = _currentCapture;
-	adns_displacement_t &displacement = _currentDisplacement;
 	adns_readout_t &readout = capture.readout;
-
-	// todo noInterrupts();
+	adns_sample_t &sample = _currentSample;
+	adns_displacement_t &displacement = sample.displacement;
 
 	// Copy Start-Time from Prior Sample Finish-Time
 	capture.startTime = capture.endTime;
@@ -93,7 +95,7 @@ void ADNS::triggerSampleCapture()
 	SPI.transfer(MOTION_LATCH_ADDR & 0x7f);
 
 	// Record Sample Finish-Time
-	usFinish = micros();
+	usFinish = micros(); // todo replace with elapsedMicros or sec,nsec
 	dt = getMicrosElapse(usStart, usFinish);
 	capture.endTime = capture.startTime + dt;
 
@@ -136,21 +138,20 @@ void ADNS::triggerSampleCapture()
 	// Update Displacement
 	displacement.dx += ((int16_t)(readout.dxL) | ((int16_t)(readout.dxH) << 8));
 	displacement.dy += ((int16_t)(readout.dyL) | ((int16_t)(readout.dyH) << 8));
-	displacement.dt += ((capture.endTime - capture.startTime));
+	displacement.dt += dt; //((capture.endTime - capture.startTime));
 
 #if (ADNS_POSITIONUPDATE_AUTOMATIC)
 	triggerPositionUpdate();
 #endif
-	// todo interrupts();
 }
 
-// Update _currentPosition and Reset _currentDisplacement
+// Update _currentPosition and Reset _currentSample
 void ADNS::triggerPositionUpdate()
 {
 	// Local References
 	adns_sample_t &sample = _lastSample;
 	adns_position_t &position = _currentPosition;
-	adns_displacement_t &displacement = _currentDisplacement;
+	adns_displacement_t &displacement = _currentSample.displacement;
 
 	// Set Timestamp with prior Position Time
 	noInterrupts();
@@ -478,9 +479,6 @@ void ADNS::initialize()
 		setMaxLiftDetectionThreshold();
 		_configuredFlag = true;
 	}
-	_currentPosition.x = 0;
-	_currentPosition.y = 0;
-	_currentPosition.t = 0;
 	_initializedFlag = true;
 }
 

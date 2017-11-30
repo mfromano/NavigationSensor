@@ -19,6 +19,14 @@
 typedef uint32_t adns_time_t;
 typedef uint32_t adns_duration_t;
 
+// Position <x,y> in 'Counts' and Elapsed-Time in Microseconds
+typedef struct
+{
+    int32_t x;     // counts
+    int32_t y;     // counts
+    adns_time_t t; // microseconds
+} adns_position_t; //todo change adns_time_t to {sec,nsec}
+
 // Raw-Readout Array
 const size_t adns_readout_max_size = 14; // size in bytes
 typedef uint8_t adns_readout_buffer_t[adns_readout_max_size];
@@ -43,21 +51,12 @@ typedef union {
     };
 } adns_readout_t;
 
-// Raw Sample with Timing Information
+// Structure with Raw Data and Time of Start
 typedef struct
 {
     adns_time_t startTime;  // microseconds
-    adns_time_t endTime;    // microseconds
     adns_readout_t readout; // byte-array
 } adns_capture_t;
-
-// Position <x,y> in 'Counts' and Elapsed-Time in Microseconds
-typedef struct
-{
-    int32_t x;     // counts
-    int32_t y;     // counts
-    adns_time_t t; // microseconds
-} adns_position_t; //todo change adns_time_t to {sec,nsec}
 
 // Displacement <dx,dy> in 'Counts' and <dy> in Microseconds
 typedef struct

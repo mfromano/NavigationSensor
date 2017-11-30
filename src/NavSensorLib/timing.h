@@ -7,6 +7,7 @@
 #define TIMING_h
 
 //todo Nanoseconds Delay
+#include <elapsedMillis.h>
 #include <glcd_delay.h>
 
 inline uint32_t getMicrosElapse(uint32_t t1, uint32_t t2);
