@@ -16,7 +16,7 @@
 
 // Create a Sensor Object with Specified Slave-Select Pin
 ADNS sensor(CHIPSELECT_PIN);
-const uint32_t msLoop = 40;
+const uint32_t msLoop = 100;
 const uint32_t usLoop = msLoop * 1000;
 elapsedMicros usCnt(0);
 
@@ -50,8 +50,8 @@ void setup()
   testBurst();
 
   // Start Acquisition
-  sensor.triggerAcquisitionStart();
   usCnt = 0;
+  sensor.triggerAcquisitionStart();
 };
 
 // =============================================================================
@@ -70,7 +70,9 @@ void loop()
   usCnt -= usLoop; // usCnt = totalLag?
 
   // Print Velocity
-  sensor.printLast();
+  sensor.triggerSampleCapture();
+  sensor.printLastMotion();
+  // sensor.printLastAdditionalInfo();
 }
 
 void printLag()
