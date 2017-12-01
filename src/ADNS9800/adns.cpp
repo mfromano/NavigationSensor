@@ -8,11 +8,6 @@
 #include "adns.h"
 #include <digitalWriteFast.h>
 
-#define DELAY_450NS asm volatile("nop")
-#define DELAY_1uS \
-	DELAY_450NS;  \
-	DELAY_450NS;
-
 // =============================================================================
 //   Setup
 // =============================================================================
@@ -37,9 +32,11 @@ void ADNS::triggerAcquisitionStart()
 		triggerAcquisitionStop();
 
 	// Flush Sample Registers -> Write 0 to Motion Register
+	noInterrupts();
 	select();
-	SPI.transfer((uint8_t)RegisterAddress::Motion | 0x80);
-	SPI.transfer(0x00);
+	// // SPI.transfer((uint8_t)RegisterAddress::Motion | 0x80);
+	// // SPI.transfer(0x00);
+	SPI.transfer((uint8_t)RegisterAddress::Motion & 0x7f);
 
 	// Set Start-Time Microsecond Offset
 	_microsSinceStart = 0;
@@ -56,10 +53,9 @@ void ADNS::triggerAcquisitionStart()
 	_readout = freshReadout;
 	_sample = freshSample;
 
-	// Standard Post-Transfer Delays
-	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_WRITE);
+	// Release SPI Bus and Interrupts Hold
 	deselect();
-	delayMicroseconds(ADNS_DELAYMICROS_POST_WRITE);
+	interrupts();
 
 	// Set Flag to Indicate Running State
 	_runningFlag = true;
@@ -100,7 +96,7 @@ void ADNS::triggerSampleCapture()
 	// Read Motion-Register
 	delayMicroseconds(ADNS_DELAYMICROS_READ_ADDR_DATA);
 	uint8_t motion = SPI.transfer(0);
-	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_READ);
+	_delayNanoseconds(ADNS_DELAYNANOS_NCSINACTIVE_POST_READ);
 	deselect();
 	delayMicroseconds(ADNS_DELAYMICROS_POST_READ);
 
@@ -140,7 +136,7 @@ void ADNS::triggerSampleCapture()
 	interrupts();
 }
 
-void ADNS::triggerAcquisitionStop() { _runningFlag = false; }
+void ADNS::triggerAcquisitionStop() { _runningFlag = false; } //todo test shutDownSensor()
 
 // =============================================================================
 // Data-Sample Conversion & Access
@@ -203,11 +199,34 @@ velocity_t ADNS::readVelocity(const unit_specification_t unit) const
 	return v;
 }
 
-void ADNS::printLast()
+adns_additional_info_t ADNS::readAdditionalInfo() const
 {
-	// Trigger Capture (and position update)
-	triggerSampleCapture();
+	// Initialize output structure and ref to most recent raw readout
+	adns_additional_info_t info;
+	const adns_readout_t &r = _readout;
 
+	// Status in Raw Bit-Fields from Sensor Registers
+	info.status.motion = r.motion;
+	info.status.observation = r.observation;
+
+	// Pixel statistics from image sensor
+	static const float PXSUM_UPPER7BITS_TO_PIXELMEAN = (1 / 1.76);
+	info.pixel.min = r.minPixel;
+	info.pixel.mean = (uint8_t)((float)r.pixelSum * PXSUM_UPPER7BITS_TO_PIXELMEAN);
+	info.pixel.max = r.maxPixel;
+	info.pixel.features = r.surfaceQuality;
+
+	// Period of Image Sensor Operation - Frame & Shutter (variable by default)
+	static const float MICROS_PER_TICK = 1.0 / ADNS_CHIP_FREQ_MHZ;
+	info.period.shutter = (float)makeWord(r.shutterPeriodH, r.shutterPeriodL) * MICROS_PER_TICK; // microseconds
+	info.period.frame = (float)makeWord(r.framePeriodH, r.framePeriodL) * MICROS_PER_TICK;		 // microseconds
+
+	// Return additional info structure
+	return info;
+}
+
+void ADNS::printLastMotion()
+{
 	// Ensure Serial Stream has Started
 	if (!Serial)
 	{
@@ -259,6 +278,34 @@ void ADNS::printLast()
 	Serial.print(",");
 	Serial.print(v.y, 3);
 	Serial.println(">\t");
+}
+
+void ADNS::printLastAdditionalInfo()
+{
+	// Read additional info
+	const adns_additional_info_t info = readAdditionalInfo();
+
+	// Status in Raw Bit-Fields from Sensor Registers
+	Serial.print("\tmotion: ");
+	Serial.print(info.status.motion, HEX);
+	Serial.print("\tobservation: ");
+	Serial.println(info.status.observation, HEX);
+
+	// Pixel statistics from image sensor
+	Serial.print("\tmin: ");
+	Serial.print(info.pixel.min);
+	Serial.print("\tmean: ");
+	Serial.print(info.pixel.mean);
+	Serial.print("\tmax: ");
+	Serial.print(info.pixel.max);
+	Serial.print("\tfeatures: ");
+	Serial.println(info.pixel.features);
+
+	// Period of Image Sensor Operation - Frame & Shutter (variable by default)
+	Serial.print("\tshutter: ");
+	Serial.print(info.period.shutter);
+	Serial.print("\tframe: ");
+	Serial.println(info.period.frame);
 }
 
 // =============================================================================
@@ -370,7 +417,7 @@ void ADNS::select()
 										 ADNS_SPI_DATA_MODE));
 		digitalWriteFast(_chipSelectPin, LOW);
 		_selectedFlag = 1;
-		delayMicroseconds(1);
+		_delayNanoseconds(ADNS_DELAYNANOS_NCSINACTIVE_POST_READ);
 	}
 }
 
@@ -394,7 +441,7 @@ uint8_t ADNS::readRegister(const RegisterAddress address)
 	delayMicroseconds(ADNS_DELAYMICROS_READ_ADDR_DATA); // tSRAD
 	uint8_t data = SPI.transfer(0);
 	// setNextTransactionDelay(ADNS_DELAYMICROS_POST_READ); //TODO use getMicrosElapse
-	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_READ); // tSCLK-NCS
+	_delayNanoseconds(ADNS_DELAYNANOS_NCSINACTIVE_POST_READ);
 	deselect();
 	delayMicroseconds(ADNS_DELAYMICROS_POST_READ);
 	return data;

@@ -6,9 +6,19 @@
 #ifndef TIMING_h
 #define TIMING_h
 
-//todo Nanoseconds Delay
+//todo Replace delayMicroseconds for SPI comm with non-blocking TimeAlarms
 #include <elapsedMillis.h>
 #include <glcd_delay.h>
+#include <Time.h>
+//todo #include <TimeAlarms.h>
+// #include <Chrono.h>
+//todo #include <FreqMeasure.h>
+//    Frequency-Input-Pin:
+//          Uno:        8
+//          Mega:       49
+//          Teensy3.x:  3
+//todo IntervalTimer timer; timer.begin(fcn,us); // precision fcn call
+//todo #include <TeensyDelay.h> // alternative
 
 inline uint32_t getMicrosElapse(uint32_t t1, uint32_t t2);
 uint32_t getMicrosElapse(uint32_t t1, uint32_t t2)
@@ -29,15 +39,5 @@ typedef struct
 } osc_time_t;
 
 typedef uint32_t time_t; // todo time_t
-
-// // extern volatile unsigned long timer0_overflow_count;
-// // extern volatile unsigned long timer0_millis_count;
-// // extern unsigned char timer0_fract;
-// // typedef struct
-// // {
-// //     const volatile unsigned long &overflow = timer0_overflow_count;
-// //     const volatile unsigned long &ms = timer0_millis_count;
-// //     const unsigned char &fract = timer0_fract;
-// // };
 
 #endif

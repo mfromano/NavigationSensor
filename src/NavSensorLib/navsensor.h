@@ -18,6 +18,11 @@
 
 #define ARRAY_SIZE(a) sizeof(a) / sizeof(a[0])
 
+// todo teensy interrupt pin
+// uno,nano,mini: 2, 3
+// mega: 2, 3, 21, 20, 19, 18
+// teensy:
+
 // // typedef unit_specification_t;
 namespace Unit
 {
@@ -235,6 +240,7 @@ typedef data_sample<vec2_cartesian<float>> velocity_sample_t;
 
 typedef struct
 {
+    int32_t count;
     time_t timestamp;
     position_t position;
     displacement_t displacement;

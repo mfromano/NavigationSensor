@@ -61,17 +61,36 @@ typedef struct
 
 typedef struct
 {
-    uint32_t count;
+    uint8_t motion;      // [mot|fault|LaserPowerValid|opmode1,opmode0|framepixfirst]
+    uint8_t observation; // 0xFF = running, 0x00 = no response
+} adns_sensor_status_t;
+
+typedef struct
+{
+    uint8_t min;      // min pixel intensity : [0,127]
+    uint8_t mean;     // mean = sumH * 512/900  or sumH/1.76 : [0,223]
+    uint8_t max;      // max intensity : [0,127]
+    uint8_t features; // number of features (actual count = feature * 4) : [0,169]
+} adns_pixel_statistics_t;
+
+typedef struct
+{
+    uint16_t shutter; // microseconds
+    uint16_t frame;   // microseconds
+} adns_period_micros_t;
+
+typedef struct
+{
+    adns_sensor_status_t status;   // raw bitfields from status registers
+    adns_pixel_statistics_t pixel; // image-stats -> min,mean,max,features
+    adns_period_micros_t period;   // length of shutter and frame period in microseconds
+} adns_additional_info_t;
+
+typedef struct
+{
+    int32_t count;
     adns_time_t timestamp;
     adns_displacement_t displacement;
 } adns_sample_t;
-//todo add 'seq' or 'index' or 'n' or 'count'
-typedef struct
-{
-    int32_t numFeatures; // actual num-features = numFeatures * 4
-    int32_t sumH;        // mean = sumH * 512/900  or sumH/1.76
-    int32_t max;
-    int32_t min;
-} pixel_statistics_t; //todo
 
 #endif

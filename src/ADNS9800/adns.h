@@ -39,7 +39,6 @@ class ADNS
 	// Trigger Start, Capture, & Readout
 	void triggerAcquisitionStart();
 	void triggerSampleCapture();
-	void triggerPositionUpdate();
 	void triggerAcquisitionStop();
 	//todo -> inline static void these for responsiveness from ISRs
 
@@ -47,7 +46,9 @@ class ADNS
 	displacement_t readDisplacement(const unit_specification_t = DEFAULT_UNIT) const;
 	position_t readPosition(const unit_specification_t = DEFAULT_UNIT) const;
 	velocity_t readVelocity(const unit_specification_t = DEFAULT_UNIT) const;
-	void printLast();
+	adns_additional_info_t readAdditionalInfo() const;
+	void printLastMotion();
+	void printLastAdditionalInfo();
 
 	// Sensor Settings
 	void setResolutionCountsPerInch(const uint16_t cpi);
@@ -69,15 +70,6 @@ class ADNS
 
 	// Mode Settings
 	void setMotionSensePinInterruptMode(const int pin);
-	// todo mode: accumulate or buffer, rising? falling?
-
-	// // // Unit Settings for read___() functions
-	// // void setDistanceUnit(const Unit::Distance unit) { _unitSpec.distance = unit; };
-	// // void setTimeUnit(const Unit::Time unit) { _unitSpec.time = unit; };
-	// // void setUnits(const unit_specification_t unitSpec) { _unitSpec = unitSpec; };
-	// // inline Unit::Distance getDistanceUnit() { return _unitSpec.distance; };
-	// // inline Unit::Time getTimeUnit() { return _unitSpec.time; };
-	// // inline unit_specification_t getUnits() { return _unitSpec; };
 
   protected:
 	// Configuration
