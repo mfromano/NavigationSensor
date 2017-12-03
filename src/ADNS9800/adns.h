@@ -36,6 +36,8 @@ class ADNS
 	bool begin(const uint16_t resolutionCPI = ADNS_DEFAULT_SENSOR_RESOLUTION,
 			   const uint16_t minSampleRateHz = ADNS_DEFAULT_SENSOR_MINSAMPLERATE);
 
+	const String getName() const { return String(ADNS_NAME + "_pin").concat(_chipSelectPin, DEC); };
+
 	// Trigger Start, Capture, & Readout
 	void triggerAcquisitionStart();
 	void triggerSampleCapture();
