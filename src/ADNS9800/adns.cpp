@@ -68,23 +68,18 @@ void ADNS::triggerSampleCapture()
 	if (!_runningFlag)
 		triggerAcquisitionStart();
 
-	noInterrupts(); // new
+	// Disable Interrupts and Lock SPI Bus
+	noInterrupts();
 	select();
 
-// Read from Motion or Motion_Burst Address to Latch Data
-#if (ADNS_READMODE_BURST)
+	// Read from Motion or Motion_Burst Address to Latch Data
 	static const byte MOTION_LATCH_ADDR = (byte)RegisterAddress::Motion_Burst;
-#else
-	static const byte MOTION_LATCH_ADDR = (byte)RegisterAddress::Motion;
-#endif
 	SPI.transfer(MOTION_LATCH_ADDR & 0x7f);
 
 	// Latch Elapsed Microseconds at End Of Sample
 	uint32_t dtLatch = _microsSinceCapture;
 
-// Read Latched Data from Sensor Registers
-#if (ADNS_READMODE_BURST)
-
+	// Read Latched Data from Sensor Registers
 	while ((_microsSinceCapture - dtLatch) < _minSamplePeriodUs)
 	{
 	};
@@ -92,31 +87,6 @@ void ADNS::triggerSampleCapture()
 
 	// Release SPI Bus
 	deselect();
-#else
-	// Read Motion-Register
-	delayMicroseconds(ADNS_DELAYMICROS_READ_ADDR_DATA);
-	uint8_t motion = SPI.transfer(0);
-	_delayNanoseconds(ADNS_DELAYNANOS_NCSINACTIVE_POST_READ);
-	deselect();
-	delayMicroseconds(ADNS_DELAYMICROS_POST_READ);
-
-	// Update Current Sample Displacement Register Values
-	_readout.motion = motion;
-	if (bit_is_set(motion, 7))
-	{
-		_readout.dxL = readRegister(RegisterAddress::Delta_X_L);
-		_readout.dxH = readRegister(RegisterAddress::Delta_X_H);
-		_readout.dyL = readRegister(RegisterAddress::Delta_Y_L);
-		_readout.dyH = readRegister(RegisterAddress::Delta_Y_H);
-	}
-	else
-	{
-		_readout.dxL = 0x00;
-		_readout.dxH = 0x00;
-		_readout.dyL = 0x00;
-		_readout.dyH = 0x00;
-	}
-#endif
 
 	// Update Displacement
 	_sample.displacement.dx = ((int16_t)(_readout.dxL) | ((int16_t)(_readout.dxH) << 8));

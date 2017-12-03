@@ -41,3 +41,18 @@ typedef struct
 typedef uint32_t time_t; // todo time_t
 
 #endif
+
+// preprocessor macros
+// __DATE__
+// __TIME__
+// __FILE__
+// __FUNCTION__
+// __LINE__
+//
+// gcc builtin functions
+// (equivalents to preprocessor macros) e.g.  __builtin_FILE
+// bcmp, alloca, bzero, dremf, dreml, drem, gettext, index, mempcpy
+// rindex, scalbf, signbit, stpcpy, toascii, acosh, ccos, cpow, csinf,
+//  fdim, fmaf, fmaxf, fmin, isblank, nearbyintf, remainderf, remainderl, 
+//  truncf, nextafter, 
+// abort, acos, asin, exit, fmod, fscanf, isdigit, tolower, malloc, memchr, 

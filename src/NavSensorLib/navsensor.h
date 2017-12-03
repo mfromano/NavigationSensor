@@ -11,12 +11,89 @@
 #include "timing.h"
 
 // =============================================================================
+// Data-Sample Template Structures
+// =============================================================================
+template <class T>
+struct vec2_cartesian
+{
+    T x;
+    T y;
+};
+
+template <class T>
+struct vec2_polar
+{
+    T r;
+    float w;
+};
+
+template <class T>
+struct data_sample
+{
+    T data;
+    time_t time;
+};
+
+// =============================================================================
+// Structured Data Sample types with values in SI-Units
+// =============================================================================
+
+typedef struct
+{
+    float x;
+    float y;
+    time_t t; //todo: 64-bit {sec,nsec}
+} position_t;
+
+typedef struct
+{
+    float dx;
+    float dy;
+    time_t dt; //todo change to duration_t
+} displacement_t;
+
+typedef vec2_cartesian<float> velocity_cartesian_t;
+typedef vec2_polar<float> velocity_polar_t;
+typedef velocity_cartesian_t velocity_t;
+typedef data_sample<vec2_cartesian<float>> displacement_sample_t;
+typedef data_sample<vec2_cartesian<float>> velocity_sample_t;
+
+typedef struct
+{
+    int32_t count;
+    time_t timestamp;
+    position_t position;
+    displacement_t displacement;
+} sample_t;
+
+// =============================================================================
 // Unit Enumerations
 // =============================================================================
 #define DEFAULT_DISTANCE_UNIT Unit::Distance::MILLIMETER
 #define DEFAULT_TIME_UNIT Unit::Time::MILLISECOND
 
+// USEFUL MACROS
+#define MAX_int8_t ((int8_t)(127))   /* 127  */
+#define MIN_int8_t ((int8_t)(-128))  /* -128 */
+#define MAX_uint8_t ((uint8_t)(255)) /* 255  */
+#define MIN_uint8_t ((uint8_t)(0))
+#define MAX_int16_t ((int16_t)(32767))   /* 32767 */
+#define MIN_int16_t ((int16_t)(-32768))  /* -32768 */
+#define MAX_uint16_t ((uint16_t)(65535)) /* 65535 */
+#define MIN_uint16_t ((uint16_t)(0))
+#define MAX_int32_t ((int32_t)(2147483647))      /* 2147483647  */
+#define MIN_int32_t ((int32_t)(-2147483647 - 1)) /* -2147483648 */
+#define MAX_uint32_t ((uint32_t)(0xFFFFFFFFU))   /* 4294967295  */
+#define MIN_uint32_t ((uint32_t)(0))
 #define ARRAY_SIZE(a) sizeof(a) / sizeof(a[0])
+
+// enables streaming-type printing
+template <class T>
+inline Print &operator<<(Print &obj, T arg)
+{
+    obj.print(arg);
+    return obj;
+}
 
 // todo teensy interrupt pin
 // uno,nano,mini: 2, 3
@@ -177,74 +254,6 @@ typedef struct
     Unit::Time time;
 } unit_specification_t;
 static constexpr unit_specification_t DEFAULT_UNIT = {DEFAULT_DISTANCE_UNIT, DEFAULT_TIME_UNIT};
-
-// =============================================================================
-// Data-Sample Template Structures
-// =============================================================================
-template <class T>
-struct vec2_cartesian
-{
-    T x;
-    T y;
-};
-
-template <class T>
-struct vec2_polar
-{
-    T r;
-    float w;
-};
-
-template <class T>
-struct data_sample
-{
-    T data;
-    time_t time;
-};
-
-// =============================================================================
-// Structured Data Sample types with values in SI-Units
-// =============================================================================
-typedef struct
-{
-    union {
-        float v[3];
-        struct
-        {
-            float x;
-            float y;
-            float t;
-        };
-    };
-} float3_xyt_t;
-
-typedef struct
-{
-    float x;
-    float y;
-    time_t t; //todo: 64-bit {sec,nsec}
-} position_t;
-
-typedef struct
-{
-    float dx;
-    float dy;
-    time_t dt; //todo change to duration_t
-} displacement_t;
-
-typedef vec2_cartesian<float> velocity_cartesian_t;
-typedef vec2_polar<float> velocity_polar_t;
-typedef velocity_cartesian_t velocity_t;
-typedef data_sample<vec2_cartesian<float>> displacement_sample_t;
-typedef data_sample<vec2_cartesian<float>> velocity_sample_t;
-
-typedef struct
-{
-    int32_t count;
-    time_t timestamp;
-    position_t position;
-    displacement_t displacement;
-} sample_t;
 
 #endif
 

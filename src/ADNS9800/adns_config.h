@@ -12,6 +12,7 @@
 // Include Common NavigationSensor Library
 // // #include "NavigationSensorLib\NavigationSensor.h" //todo: make common
 // settings or functions
+#define ADNS_NAME "ADNS9800"
 
 // Include Updateable File with ADNS Sensor Firmware
 #ifndef ADNS_FIRMWARE_INCLUDE_FILENAME
@@ -29,9 +30,6 @@
 #define ADNS_RESOLUTION_MAX_CPI 8200 // 0xA4
 #define ADNS_MAX_SAMPLE_RATE_HZ 12000
 #define ADNS_CHIP_FREQ_MHZ 50
-
-// Modes
-#define ADNS_READMODE_BURST 1
 
 // SPI Communication Timing
 #define ADNS_DELAYMICROS_POST_READ 20
