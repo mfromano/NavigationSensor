@@ -15,6 +15,8 @@
 #include <SPI.h>
 #include <stdint.h>
 #include <elapsedMillis.h>
+#include <glcd_delay.h>
+#include <digitalWriteFast.h>
 
 // Sensor Register Include - ADNS-9800
 #include "adns_config.h"
@@ -36,7 +38,7 @@ class ADNS
 	bool begin(const uint16_t resolutionCPI = ADNS_DEFAULT_SENSOR_RESOLUTION,
 			   const uint16_t minSampleRateHz = ADNS_DEFAULT_SENSOR_MINSAMPLERATE);
 
-	const String getName() const { return String(ADNS_NAME + "_pin").concat(_chipSelectPin, DEC); };
+	String getName(); // { return String(ADNS_NAME).concat(String("_pin")).concat(String(_chipSelectPin, DEC)); };
 
 	// Trigger Start, Capture, & Readout
 	void triggerAcquisitionStart();
@@ -101,14 +103,14 @@ class ADNS
 	uint16_t _resolutionCountsPerInch; // Counts-Per-Inch
 	uint16_t _maxSamplePeriodUs;	   // Microseconds
 	uint16_t _minSamplePeriodUs;	   // Microseconds
-	elapsedMicros _microsSinceStart;
-	elapsedMicros _microsSinceCapture;
 
 	// Unit Conversions
 	float _resolutionInchPerCount;
 	// // unit_specification_t _unitSpec = DEFAULT_UNIT;
 
 	// Readout Data
+	elapsedMicros _microsSinceStart;
+	elapsedMicros _microsSinceCapture;
 	adns_position_t _position;
 	adns_readout_t _readout;
 	adns_sample_t _sample;

@@ -12,7 +12,7 @@
 // Include Common NavigationSensor Library
 // // #include "NavigationSensorLib\NavigationSensor.h" //todo: make common
 // settings or functions
-#define ADNS_NAME "ADNS9800"
+#define ADNS_NAME ("ADNS9800")
 
 // Include Updateable File with ADNS Sensor Firmware
 #ifndef ADNS_FIRMWARE_INCLUDE_FILENAME
@@ -36,8 +36,9 @@
 #define ADNS_DELAYMICROS_POST_WRITE 120
 #define ADNS_DELAYMICROS_POST_RESET 30000
 #define ADNS_DELAYMICROS_READ_ADDR_DATA 100
-#define ADNS_DELAYNANOS_NCSINACTIVE_POST_READ 1 // 120ns
 #define ADNS_DELAYMICROS_NCSINACTIVE_POST_WRITE 20
+#define ADNS_DELAYNANOS_NCSINACTIVE_POST_READ 120 // 120ns
+#define ADNS_DELAYNANOS_NCS_SCLKACTIVE 120
 // todo: macro functions to implement SPI_DELAY_****
 //#define ADNS_SQUAL2NUMFEATURES(v)	((uint32_t) v* 4)
 

@@ -6,7 +6,6 @@
 */
 
 #include "adns.h"
-#include <digitalWriteFast.h>
 
 // =============================================================================
 //   Setup
@@ -17,6 +16,14 @@ bool ADNS::begin(const uint16_t cpi, const uint16_t hz)
 	_maxSamplePeriodUs = (uint16_t)(1000000UL / (uint32_t)hz);
 	initialize();
 	return true;
+}
+
+String ADNS::getName()
+{
+	String chip = String(ADNS_NAME);
+	String pin = String("_pin") + String(_chipSelectPin, DEC);
+	String name = chip + pin;
+	return name;
 }
 
 // =============================================================================
@@ -73,8 +80,7 @@ void ADNS::triggerSampleCapture()
 	select();
 
 	// Read from Motion or Motion_Burst Address to Latch Data
-	static const byte MOTION_LATCH_ADDR = (byte)RegisterAddress::Motion_Burst;
-	SPI.transfer(MOTION_LATCH_ADDR & 0x7f);
+	SPI.transfer((byte)RegisterAddress::Motion_Burst & 0x7f);
 
 	// Latch Elapsed Microseconds at End Of Sample
 	uint32_t dtLatch = _microsSinceCapture;
@@ -387,7 +393,7 @@ void ADNS::select()
 										 ADNS_SPI_DATA_MODE));
 		digitalWriteFast(_chipSelectPin, LOW);
 		_selectedFlag = 1;
-		_delayNanoseconds(ADNS_DELAYNANOS_NCSINACTIVE_POST_READ);
+		_delayNanoseconds(ADNS_DELAYNANOS_NCS_SCLKACTIVE);
 	}
 }
 
@@ -406,11 +412,9 @@ uint8_t ADNS::readRegister(const RegisterAddress address)
 {
 	// Send 7-bit address with msb=0, clock for 1 uint8_t to receive 1 uint8_t
 	select();
-	// waitNextTransactionDelay(); //TODO use getMicrosElapse
 	SPI.transfer((uint8_t)address & 0x7f);
 	delayMicroseconds(ADNS_DELAYMICROS_READ_ADDR_DATA); // tSRAD
 	uint8_t data = SPI.transfer(0);
-	// setNextTransactionDelay(ADNS_DELAYMICROS_POST_READ); //TODO use getMicrosElapse
 	_delayNanoseconds(ADNS_DELAYNANOS_NCSINACTIVE_POST_READ);
 	deselect();
 	delayMicroseconds(ADNS_DELAYMICROS_POST_READ);
@@ -421,10 +425,8 @@ void ADNS::writeRegister(const RegisterAddress address, const uint8_t data)
 {
 	// Send 7-bit address with msb=1 followed by data to write
 	select();
-	// waitNextTransactionDelay(); //TODO use getMicrosElapse
 	SPI.transfer((uint8_t)address | 0x80);
 	SPI.transfer(data);
-	// setNextTransactionDelay(ADNS_DELAYMICROS_POST_WRITE); //TODO getMicrosElapse
 	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_WRITE);
 	deselect();
 	delayMicroseconds(ADNS_DELAYMICROS_POST_WRITE);
