@@ -7,7 +7,9 @@
 		"type": "git",
 		"url" : "https://github.com/markbucklin/NavigationSensor.git"
 	},
-	"include"   : "NavSensorLib",
+	"export": {
+		"include": "src/NavSensorLib"
+	},
 	"platforms" : "*",
 	"frameworks": "arduino"
 }
