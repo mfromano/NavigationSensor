@@ -120,9 +120,6 @@ void ADNS::triggerAcquisitionStop() { _runningFlag = false; } //todo test shutDo
 //todo: homogenize and combine these functions
 displacement_t ADNS::readDisplacement(const unit_specification_t unit) const
 {
-	// Retrieve last displacement sample
-	const adns_displacement_t &displacement = _sample.displacement;
-
 	// Initialize sample return structure
 	displacement_t u;
 
@@ -131,17 +128,14 @@ displacement_t ADNS::readDisplacement(const unit_specification_t unit) const
 	const float timePerCount = Unit::perMicrosecond(unit.time);
 
 	// Apply Conversion Coefficient
-	u.dx = (float)displacement.dx * distancePerCount;
-	u.dy = (float)displacement.dy * distancePerCount;
-	u.dt = (float)displacement.dt * timePerCount;
+	u.dx = (float)_sample.displacement.dx * distancePerCount;
+	u.dy = (float)_sample.displacement.dy * distancePerCount;
+	u.dt = (float)_sample.displacement.dt * timePerCount;
 	return u;
 }
 
 position_t ADNS::readPosition(const unit_specification_t unit) const
 {
-	// Retrieve last displacement sample
-	const adns_position_t &position = _position;
-
 	// Initialize sample return structure
 	position_t p;
 
@@ -150,28 +144,25 @@ position_t ADNS::readPosition(const unit_specification_t unit) const
 	const float timePerCount = Unit::perMicrosecond(unit.time);
 
 	// Apply Conversion Coefficient
-	p.x = (float)position.x * distancePerCount;
-	p.y = (float)position.y * distancePerCount;
-	p.t = (float)position.t * timePerCount;
+	p.x = (float)_position.x * distancePerCount;
+	p.y = (float)_position.y * distancePerCount;
+	p.t = (float)_position.t * timePerCount;
 	return p;
 }
 
 velocity_t ADNS::readVelocity(const unit_specification_t unit) const
 {
-	// Retrieve last displacement sample
-	const adns_displacement_t &displacement = _sample.displacement;
-
 	// Initialize sample return structure
 	velocity_t v;
 
 	// Pre-Compute Conversion Coefficients for Efficiency
 	const float distancePerCount = Unit::perInch(unit.distance) * _resolutionInchPerCount;
 	const float timePerCount = Unit::perMicrosecond(unit.time);
-	const float distancePerTimeInterval = distancePerCount * 1 / (timePerCount * (float)displacement.dt);
+	const float distancePerTimeInterval = distancePerCount * 1 / (timePerCount * (float)_sample.displacement.dt);
 
 	// Apply Conversion Coefficient
-	v.x = (float)displacement.dx * distancePerTimeInterval;
-	v.y = (float)displacement.dy * distancePerTimeInterval;
+	v.x = (float)_sample.displacement.dx * distancePerTimeInterval;
+	v.y = (float)_sample.displacement.dy * distancePerTimeInterval;
 	return v;
 }
 
@@ -179,23 +170,22 @@ adns_additional_info_t ADNS::readAdditionalInfo() const
 {
 	// Initialize output structure and ref to most recent raw readout
 	adns_additional_info_t info;
-	const adns_readout_t &r = _readout;
 
 	// Status in Raw Bit-Fields from Sensor Registers
-	info.status.motion = r.motion;
-	info.status.observation = r.observation;
+	info.status.motion = _readout.motion;
+	info.status.observation = _readout.observation;
 
 	// Pixel statistics from image sensor
 	static const float PXSUM_UPPER7BITS_TO_PIXELMEAN = (1 / 1.76);
-	info.pixel.min = r.minPixel;
-	info.pixel.mean = (uint8_t)((float)r.pixelSum * PXSUM_UPPER7BITS_TO_PIXELMEAN);
-	info.pixel.max = r.maxPixel;
-	info.pixel.features = r.surfaceQuality;
+	info.pixel.min = _readout.minPixel;
+	info.pixel.mean = (uint8_t)((float)_readout.pixelSum * PXSUM_UPPER7BITS_TO_PIXELMEAN);
+	info.pixel.max = _readout.maxPixel;
+	info.pixel.features = _readout.surfaceQuality;
 
 	// Period of Image Sensor Operation - Frame & Shutter (variable by default)
 	static const float MICROS_PER_TICK = 1.0 / ADNS_CHIP_FREQ_MHZ;
-	info.period.shutter = (float)makeWord(r.shutterPeriodH, r.shutterPeriodL) * MICROS_PER_TICK; // microseconds
-	info.period.frame = (float)makeWord(r.framePeriodH, r.framePeriodL) * MICROS_PER_TICK;		 // microseconds
+	info.period.shutter = (float)makeWord(_readout.shutterPeriodH, _readout.shutterPeriodL) * MICROS_PER_TICK; // microseconds
+	info.period.frame = (float)makeWord(_readout.framePeriodH, _readout.framePeriodL) * MICROS_PER_TICK;	   // microseconds
 
 	// Return additional info structure
 	return info;

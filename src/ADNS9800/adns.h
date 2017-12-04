@@ -106,9 +106,9 @@ class ADNS
 	// Readout Data
 	elapsedMicros _microsSinceStart;
 	elapsedMicros _microsSinceCapture;
-	adns_position_t _position;
-	adns_readout_t _readout;
-	adns_sample_t _sample;
+	volatile adns_position_t _position;
+	volatile adns_readout_t _readout;
+	volatile adns_sample_t _sample;
 };
 
 #endif
