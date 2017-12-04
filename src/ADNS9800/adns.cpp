@@ -6,18 +6,24 @@
 */
 
 #include "adns.h"
-#include <elapsedMillis.h>
-#include <digitalWriteFast.h>
 
 // =============================================================================
 //   Setup
 // =============================================================================
 bool ADNS::begin(const uint16_t cpi, const uint16_t hz)
 {
-	_resolution = cpi;
-	_minSampleRate = hz;
+	_resolutionCountsPerInch = cpi;
+	_maxSamplePeriodUs = (uint16_t)(1000000UL / (uint32_t)hz);
 	initialize();
 	return true;
+}
+
+String ADNS::getName()
+{
+	String chip = String(ADNS_NAME);
+	String pin = String("_pin") + String(_chipSelectPin, DEC);
+	String name = chip + pin;
+	return name;
 }
 
 // =============================================================================
@@ -33,301 +39,348 @@ void ADNS::triggerAcquisitionStart()
 		triggerAcquisitionStop();
 
 	// Flush Sample Registers -> Write 0 to Motion Register
+	noInterrupts();
 	select();
-	SPI.transfer((uint8_t)RegisterAddress::Motion | 0x80);
-	SPI.transfer(0x00);
+	// // SPI.transfer((uint8_t)RegisterAddress::Motion | 0x80);
+	// // SPI.transfer(0x00);
+	SPI.transfer((uint8_t)RegisterAddress::Motion & 0x7f);
 
 	// Set Start-Time Microsecond Offset
-	adns_time_t us = micros();
-	adns_capture_t &sample = _currentCapture;
-	sample.startTime = 0;
-	sample.endTime = 0;
-	sample.readout.motion = 0x00;
-	_acquisitionStartMicrosCountOffset = us;
-	// // _lastSampleMicrosCount = us;
+	_microsSinceStart = 0;
+	_microsSinceCapture = _microsSinceStart;
 
-	// Standard Delays
-	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_WRITE);
+	// Reset Current Position
+	_position.x = 0;
+	_position.y = 0;
+	_position.t = 0;
+
+	// Reset Current Raw-Readout & Sample Buffers with Fresh Data
+	static adns_readout_t freshReadout;
+	static adns_sample_t freshSample;
+	_readout = freshReadout;
+	_sample = freshSample;
+
+	// Release SPI Bus and Interrupts Hold
 	deselect();
-	delayMicroseconds(ADNS_DELAYMICROS_POST_WRITE);
+	interrupts();
 
 	// Set Flag to Indicate Running State
 	_runningFlag = true;
 }
 
-// Read from ADNS9800 Sensor and Update _currentCapture & _currentDisplacement
+// Read from ADNS9800 Sensor and Update _currentCapture & _sample
 void ADNS::triggerSampleCapture()
 {
 	// Trigger Start if Not Running
 	if (!_runningFlag)
 		triggerAcquisitionStart();
 
-	// Timestamps
-	adns_time_t usStart, usFinish;
-	adns_duration_t dt;
-
-	// Get Local References to Current Data Structures
-	adns_capture_t &capture = _currentCapture;
-	adns_displacement_t &displacement = _currentDisplacement;
-	adns_readout_t &readout = capture.readout;
-
-	// todo noInterrupts();
-
-	// Copy Start-Time from Prior Sample Finish-Time
-	capture.startTime = capture.endTime;
-	usStart = capture.startTime + _acquisitionStartMicrosCountOffset;
-
-	// Run Read-Register Sequence with Timestamp Inserted Directly after Address
+	// Disable Interrupts and Lock SPI Bus
+	noInterrupts();
 	select();
 
 	// Read from Motion or Motion_Burst Address to Latch Data
-	SPI.transfer(ADNS::_motionLatchRegAddr & 0x7f);
+	SPI.transfer((byte)RegisterAddress::Motion_Burst & 0x7f);
 
-	// Record Sample Finish-Time
-	usFinish = micros();
-	dt = getMicrosElapse(usStart, usFinish);
-	capture.endTime = capture.startTime + dt;
+	// Latch Elapsed Microseconds at End Of Sample
+	uint32_t dtLatch = _microsSinceCapture;
 
 	// Read Latched Data from Sensor Registers
-	if (ADNS::_burstModeFlag)
+	while ((_microsSinceCapture - dtLatch) < _minSamplePeriodUs)
 	{
-		while (getMicrosElapse(capture.endTime, micros()) < _minSamplePeriod)
-		{
-		};
-		for (uint8_t k = 0; k < adns_readout_max_size; k++)
-		{
-			readout.data[k] = SPI.transfer(0x00);
-		}
-	}
-	else
-	{
-		// Read Motion-Register
-		delayMicroseconds(ADNS_DELAYMICROS_READ_ADDR_DATA);
-		uint8_t motion = SPI.transfer(0);
-		delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_READ);
-		deselect();
-		delayMicroseconds(ADNS_DELAYMICROS_POST_READ);
-
-		// Update Current Sample Displacement Register Values
-		readout.motion = motion;
-		if (bit_is_set(motion, 7))
-		{
-			readout.dxL = readRegister(RegisterAddress::Delta_X_L);
-			readout.dxH = readRegister(RegisterAddress::Delta_X_H);
-			readout.dyL = readRegister(RegisterAddress::Delta_Y_L);
-			readout.dyH = readRegister(RegisterAddress::Delta_Y_H);
-		}
-		else
-		{
-			readout.dxL = 0x00;
-			readout.dxH = 0x00;
-			readout.dyL = 0x00;
-			readout.dyH = 0x00;
-		}
-	}
+	};
+	SPI.transfer(_readout.data, adns_readout_max_size);
 
 	// Release SPI Bus
 	deselect();
 
 	// Update Displacement
-	displacement.dx += ((int16_t)(readout.dxL) | ((int16_t)(readout.dxH) << 8));
-	displacement.dy += ((int16_t)(readout.dyL) | ((int16_t)(readout.dyH) << 8));
-	displacement.dt += ((capture.endTime - capture.startTime));
+	_sample.displacement.dx = ((int16_t)(_readout.dxL) | ((int16_t)(_readout.dxH) << 8));
+	_sample.displacement.dy = ((int16_t)(_readout.dyL) | ((int16_t)(_readout.dyH) << 8));
+	_sample.displacement.dt = dtLatch; //((capture.endTime - capture.startTime));
 
-	if (_autoUpdateFlag)
-		triggerPositionUpdate();
-
-	// todo interrupts();
-}
-
-// Update _currentPosition and Reset _currentDisplacement
-void ADNS::triggerPositionUpdate()
-{
-	// Local References
-	adns_sample_t &sample = _lastSample;
-	adns_position_t &position = _currentPosition;
-	adns_displacement_t &displacement = _currentDisplacement;
-
-	// Set Timestamp with prior Position Time
-	noInterrupts();
-	sample.timestamp = position.t;
+	// Update Elapsed-Microsecond-Since-Capture Counter
+	_sample.count++;
+	_sample.timestamp = _microsSinceCapture - _microsSinceStart; // position.t;
+	_microsSinceCapture -= dtLatch;
 
 	// Update Current Position Data
-	position.x += displacement.dx;
-	position.y += displacement.dy;
-	position.t += displacement.dt;
+	_position.x += _sample.displacement.dx;
+	_position.y += _sample.displacement.dy;
+	_position.t += _sample.displacement.dt;
 
-	// Copy & Reset Displacement
-	sample.displacement = displacement;
-	displacement = {0, 0, 0};
 	interrupts();
 }
 
-void ADNS::triggerAcquisitionStop() { _runningFlag = false; }
+void ADNS::triggerAcquisitionStop() { _runningFlag = false; } //todo test shutDownSensor()
 
 // =============================================================================
 // Data-Sample Conversion & Access
 // =============================================================================
-displacement_t ADNS::readDisplacement()
+//todo: homogenize and combine these functions
+displacement_t ADNS::readDisplacement(const unit_specification_t unit) const
 {
 	// Retrieve last displacement sample
-	const adns_displacement_t &displacement = _lastSample.displacement;
+	const adns_displacement_t &displacement = _sample.displacement;
 
 	// Initialize sample return structure
 	displacement_t u;
 
-	// Convert Displacement Since Last Read to Velocity Sample
-	const float &cpi = _resolution;			  // counts-per-inch
-	float umPerCnt = 25400.0 / cpi;			  // micrometers-per-count //todo constexpr
-	u.dx = (float)displacement.dx * umPerCnt; // micron
-	u.dy = (float)displacement.dy * umPerCnt; // micron
-	u.dt = (float)displacement.dt;			  // microseconds // todo: standard units
+	// Pre-Compute Conversion Coefficients for Efficiency
+	const float distancePerCount = Unit::perInch(unit.distance) * _resolutionInchPerCount;
+	const float timePerCount = Unit::perMicrosecond(unit.time);
+
+	// Apply Conversion Coefficient
+	u.dx = (float)displacement.dx * distancePerCount;
+	u.dy = (float)displacement.dy * distancePerCount;
+	u.dt = (float)displacement.dt * timePerCount;
 	return u;
 }
 
-position_t ADNS::readPosition()
+position_t ADNS::readPosition(const unit_specification_t unit) const
 {
 	// Retrieve last displacement sample
-	const adns_position_t &position = _currentPosition;
+	const adns_position_t &position = _position;
 
 	// Initialize sample return structure
 	position_t p;
 
-	// Convert Displacement Since Last Read to Velocity Sample
-	const float &cpi = _resolution;		// counts-per-inch
-	float mmPerCnt = 25.4 / cpi;		// millimeters-per-count //todo constant conversion when resolution set
-	p.x = (float)position.x * mmPerCnt; // millimeters
-	p.y = (float)position.y * mmPerCnt; // millimeters
-	p.t = position.t;					// microseconds // todo: standard units
+	// Pre-Compute Conversion Coefficients for Efficiency
+	const float distancePerCount = Unit::perInch(unit.distance) * _resolutionInchPerCount;
+	const float timePerCount = Unit::perMicrosecond(unit.time);
+
+	// Apply Conversion Coefficient
+	p.x = (float)position.x * distancePerCount;
+	p.y = (float)position.y * distancePerCount;
+	p.t = position.t * timePerCount;
 	return p;
 }
 
-velocity_t ADNS::readVelocity()
+velocity_t ADNS::readVelocity(const unit_specification_t unit) const
 {
 	// Retrieve last displacement sample
-	const adns_displacement_t &displacement = _lastSample.displacement;
+	const adns_displacement_t &displacement = _sample.displacement;
 
 	// Initialize sample return structure
 	velocity_t v;
-	float dx, dy; //todo displacement_t p;
 
-	// Convert Displacement Since Last Read to Velocity Sample
-	const float cpi = _resolution;						 // counts-per-inch
-	const float dtInverse = 1000000.0 / displacement.dt; // 1/second
-	// // float cmPerCntSec = (2.54 * 1000000.0) / (cpi * displacement.dt);
-	// // v.x = displacement.dx * cmPerCntSec;
-	// // v.y = displacement.dy * cmPerCntSec;
-	dx = (displacement.dx / cpi) * 2.54; // centimeters
-	dy = (displacement.dy / cpi) * 2.54; // centimeters
-	v.x = dx * dtInverse;				 // cm/second
-	v.y = dy * dtInverse;				 // cm/second
+	// Pre-Compute Conversion Coefficients for Efficiency
+	const float distancePerCount = Unit::perInch(unit.distance) * _resolutionInchPerCount;
+	const float timePerCount = Unit::perMicrosecond(unit.time);
+	const float distancePerTimeInterval = distancePerCount * 1 / (timePerCount * (float)displacement.dt);
+
+	// Apply Conversion Coefficient
+	v.x = (float)displacement.dx * distancePerTimeInterval;
+	v.y = (float)displacement.dy * distancePerTimeInterval;
 	return v;
 }
 
-void ADNS::printLast()
+adns_additional_info_t ADNS::readAdditionalInfo() const
 {
-	// // struct
-	// // {
-	// // 	uint32_t capture;
-	// // 	uint32_t update;
-	// // 	uint32_t velocity;
-	// // } t;
-	// // elapsedMicros elap(0);
+	// Initialize output structure and ref to most recent raw readout
+	adns_additional_info_t info;
+	const adns_readout_t &r = _readout;
 
-	// // triggerSampleCapture();
-	// // t.capture = elap;
-	// // elap = 0;
-	// // if (!_autoUpdateFlag)
-	// // {
-	// // 	triggerPositionUpdate();
-	// // 	t.update = elap;
-	// // 	elap = 0;
-	// // }
-	// // velocity_t v = readVelocity();
-	// // t.velocity = elap;
+	// Status in Raw Bit-Fields from Sensor Registers
+	info.status.motion = r.motion;
+	info.status.observation = r.observation;
 
-	triggerSampleCapture();
-	if (!_autoUpdateFlag)
-	{
-		triggerPositionUpdate();
-	}
-	displacement_t u = readDisplacement();
-	position_t p = readPosition();
-	velocity_t v = readVelocity();
+	// Pixel statistics from image sensor
+	static const float PXSUM_UPPER7BITS_TO_PIXELMEAN = (1 / 1.76);
+	info.pixel.min = r.minPixel;
+	info.pixel.mean = (uint8_t)((float)r.pixelSum * PXSUM_UPPER7BITS_TO_PIXELMEAN);
+	info.pixel.max = r.maxPixel;
+	info.pixel.features = r.surfaceQuality;
 
+	// Period of Image Sensor Operation - Frame & Shutter (variable by default)
+	static const float MICROS_PER_TICK = 1.0 / ADNS_CHIP_FREQ_MHZ;
+	info.period.shutter = (float)makeWord(r.shutterPeriodH, r.shutterPeriodL) * MICROS_PER_TICK; // microseconds
+	info.period.frame = (float)makeWord(r.framePeriodH, r.framePeriodL) * MICROS_PER_TICK;		 // microseconds
+
+	// Return additional info structure
+	return info;
+}
+
+void ADNS::printLastMotion()
+{
+	// Ensure Serial Stream has Started
 	if (!Serial)
 	{
 		Serial.begin(115200);
 		delay(50);
 	}
 	// Print Timestamp of Last Sample
-	Serial.println(_lastSample.timestamp);
+	Serial.print("\ntimestamp [us]:\t");
+	Serial.println(_sample.timestamp);
+
+	// Initialize Unit-Specification and Description Variables
+	unit_specification_t unitType;
+	String xyUnit;
+	String tUnit;
 
 	// Print Displacement
-	Serial.print("<dx,dy,dt> [um,um,us]:\t<");
-	Serial.print(u.dx);
+	unitType = {Unit::Distance::MICROMETER, Unit::Time::MICROSECOND};
+	xyUnit = Unit::getAbbreviation(unitType.distance);
+	tUnit = Unit::getAbbreviation(unitType.time);
+	displacement_t u = readDisplacement(unitType);
+	Serial.print("<dx,dy,dt> [" + xyUnit + "," + xyUnit + "," + tUnit + "]\t<");
+	Serial.print(u.dx, 3);
 	Serial.print(",");
-	Serial.print(u.dy);
+	Serial.print(u.dy, 3);
 	Serial.print(",");
 	Serial.print(u.dt);
 	Serial.println(">\t");
 
 	// Print Position
-	Serial.print("<x,y,t> [mm,mm,us]:\t<");
-	Serial.print(p.x);
+	unitType = {Unit::Distance::MILLIMETER, Unit::Time::MILLISECOND};
+	xyUnit = Unit::getAbbreviation(unitType.distance);
+	tUnit = Unit::getAbbreviation(unitType.time);
+	position_t p = readPosition(unitType);
+	Serial.print("<x,y,t> [" + xyUnit + "," + xyUnit + "," + tUnit + "]\t<");
+	Serial.print(p.x, 3);
 	Serial.print(",");
-	Serial.print(p.y);
+	Serial.print(p.y, 3);
 	Serial.print(",");
 	Serial.print(p.t);
 	Serial.println(">\t");
 
 	// Print Velocity
-	Serial.print("<Vx,Vy> [cm/s]:\t<");
-	Serial.print(v.x);
+	unitType = {Unit::Distance::METER, Unit::Time::SECOND};
+	xyUnit = Unit::getAbbreviation(unitType.distance);
+	tUnit = Unit::getAbbreviation(unitType.time);
+	velocity_t v = readVelocity(unitType);
+	Serial.print("<Vx,Vy> [" + xyUnit + "/" + tUnit + "," + xyUnit + "/" + tUnit + "]\t<");
+	Serial.print(v.x, 3);
 	Serial.print(",");
-	Serial.print(v.y);
+	Serial.print(v.y, 3);
 	Serial.println(">\t");
+}
 
-	// // // Print Elapsed Time //todo remove
-	// // Serial.print("\tcapture: ");
-	// // Serial.print(t.capture);
-	// // Serial.print("\tupdate: ");
-	// // Serial.print(t.update);
-	// // Serial.print("\tvelocity: ");
-	// // Serial.println(t.velocity);
+void ADNS::printLastAdditionalInfo()
+{
+	// Read additional info
+	const adns_additional_info_t info = readAdditionalInfo();
+
+	// Status in Raw Bit-Fields from Sensor Registers
+	Serial.print("\tmotion: ");
+	Serial.print(info.status.motion, HEX);
+	Serial.print("\tobservation: ");
+	Serial.println(info.status.observation, HEX);
+
+	// Pixel statistics from image sensor
+	Serial.print("\tmin: ");
+	Serial.print(info.pixel.min);
+	Serial.print("\tmean: ");
+	Serial.print(info.pixel.mean);
+	Serial.print("\tmax: ");
+	Serial.print(info.pixel.max);
+	Serial.print("\tfeatures: ");
+	Serial.println(info.pixel.features);
+
+	// Period of Image Sensor Operation - Frame & Shutter (variable by default)
+	Serial.print("\tshutter: ");
+	Serial.print(info.period.shutter);
+	Serial.print("\tframe: ");
+	Serial.println(info.period.frame);
 }
 
 // =============================================================================
-// Output Unit
+// Sensor Settings
 // =============================================================================
-void ADNS::setDisplacementUnits(Unit::Distance distance, Unit::Time time)
+void ADNS::setResolutionCountsPerInch(const uint16_t cpi)
 {
-	ADNS::dist_time_unit_t &unit = _unit.displacement;
-	unit.distance = distance;
-	unit.time = time;
-}
-void ADNS::setPositionUnits(Unit::Distance distance, Unit::Time time)
-{
-	ADNS::dist_time_unit_t &unit = _unit.position;
-	unit.distance = distance;
-	unit.time = time;
-}
-void ADNS::setVelocityUnits(Unit::Distance distance, Unit::Time time)
-{
-	ADNS::dist_time_unit_t &unit = _unit.velocity;
-	unit.distance = distance;
-	unit.time = time;
+	// Input may take any value between 50 and 8200 (will be rounded to nearest 50
+	// cpi)
+	uint16_t cpiValid =
+		constrain(cpi, ADNS_RESOLUTION_MIN_CPI, ADNS_RESOLUTION_MAX_CPI);
+	// uint8_t data = readRegister(RegisterAddress::Configuration_I);
+	// Keep current values from reserved bits (0x3f = B00111111) note: data sheet
+	// has error, mask is 0xFF uint8_t mask = ADNS_RESOLUTION_REGISTER_MASK; data
+	// = (data & ~mask) | (((uint8_t)(cpi / (uint16_t)ADNS_RESOLUTION_MIN_CPI)) &
+	// mask);
+	uint8_t data = (uint8_t)(cpiValid / (uint16_t)ADNS_RESOLUTION_MIN_CPI);
+	writeRegister(RegisterAddress::Configuration_I, data);
+	// Read back resolution from same register to confirm and store in cached
+	// property
+	getResolutionCountsPerInch(); // todo: check resolution matches assigned resolution ->
+								  // report
 }
 
-// // void ADNS::setDistanceUnit(Unit::Distance unit)
-// // {
-// // 	_unit.distance = unit;
-// // }
+uint16_t ADNS::getResolutionCountsPerInch()
+{
+	uint8_t mask = ADNS_RESOLUTION_REGISTER_MASK;
+	uint8_t data = readRegister(RegisterAddress::Configuration_I);
+	data = data & mask;
+	uint16_t cpi = (uint16_t)data * (uint16_t)ADNS_RESOLUTION_MIN_CPI;
+	_resolutionCountsPerInch = cpi;
+	_resolutionInchPerCount = 1.0f / (float)cpi;
+	return cpi;
+}
 
-// // void ADNS::setTimeUnit(Unit::Time unit)
-// // {
-// // 	_unit.time = unit;
-// // }
+void ADNS::setMaxSamplePeriodUs(const uint16_t us)
+{
+	/* Configures sensor hardware -> sets the maximum frame period (minimum frame
+  rate) that can be selected by the automatic frame rate control, OR the actual
+  frame rate if the sensor is placed in manual frame rate control mode
+  */
+	uint8_t dataL, dataH;
+	uint16_t delayNumCyles = us * ADNS_CHIP_FREQ_MHZ;
+	dataL = lowByte(delayNumCyles);
+	dataH = highByte(delayNumCyles);
+	writeRegister(RegisterAddress::Frame_Period_Max_Bound_Lower, dataL);
+	writeRegister(RegisterAddress::Frame_Period_Max_Bound_Upper, dataH);
+	getMaxSamplePeriodUs();
+}
+
+uint16_t ADNS::getMaxSamplePeriodUs()
+{
+	uint8_t dataL, dataH;
+	dataH = readRegister(RegisterAddress::Frame_Period_Max_Bound_Upper);
+	dataL = readRegister(RegisterAddress::Frame_Period_Max_Bound_Lower);
+	uint16_t us = makeWord(dataH, dataL) / ADNS_CHIP_FREQ_MHZ;
+	_maxSamplePeriodUs = us;
+	return us;
+}
+
+void ADNS::setMinSamplePeriodUs(const uint16_t us)
+{
+	// todo ensure frameperiod_maxbound >= frameperiod_minbound + shutter_maxbound
+	uint8_t dataL, dataH;
+	uint16_t delayNumCyles = us * ADNS_CHIP_FREQ_MHZ;
+	dataL = lowByte(delayNumCyles);
+	dataH = highByte(delayNumCyles);
+	writeRegister(RegisterAddress::Frame_Period_Min_Bound_Lower, dataL);
+	writeRegister(RegisterAddress::Frame_Period_Min_Bound_Upper, dataH);
+	getMinSamplePeriodUs();
+}
+
+uint16_t ADNS::getMinSamplePeriodUs()
+{
+	uint8_t dataL, dataH;
+	dataH = readRegister(RegisterAddress::Frame_Period_Min_Bound_Upper);
+	dataL = readRegister(RegisterAddress::Frame_Period_Min_Bound_Lower);
+	uint16_t us = makeWord(dataH, dataL) / ADNS_CHIP_FREQ_MHZ;
+	_minSamplePeriodUs = us;
+	return us;
+}
+
+// =============================================================================
+// Sensor Status
+// =============================================================================
+uint16_t ADNS::getSamplePeriodUs()
+{
+	uint8_t dataL, dataH;
+	dataH = readRegister(RegisterAddress::Frame_Period_Upper);
+	dataL = readRegister(RegisterAddress::Frame_Period_Lower);
+	uint16_t us = makeWord(dataH, dataL) / ADNS_CHIP_FREQ_MHZ;
+	return us;
+}
+
+uint16_t ADNS::getSampleRateHz()
+{
+	uint16_t us = getSamplePeriodUs();
+	return (uint16_t)(1000000UL / (uint32_t)us);
+}
 
 // =============================================================================
 // Sensor Communication (SPI)
@@ -340,7 +393,7 @@ void ADNS::select()
 										 ADNS_SPI_DATA_MODE));
 		digitalWriteFast(_chipSelectPin, LOW);
 		_selectedFlag = 1;
-		delayMicroseconds(1);
+		_delayNanoseconds(ADNS_DELAYNANOS_NCS_SCLKACTIVE);
 	}
 }
 
@@ -359,12 +412,10 @@ uint8_t ADNS::readRegister(const RegisterAddress address)
 {
 	// Send 7-bit address with msb=0, clock for 1 uint8_t to receive 1 uint8_t
 	select();
-	// waitNextTransactionDelay(); //TODO use getMicrosElapse
 	SPI.transfer((uint8_t)address & 0x7f);
 	delayMicroseconds(ADNS_DELAYMICROS_READ_ADDR_DATA); // tSRAD
 	uint8_t data = SPI.transfer(0);
-	// setNextTransactionDelay(ADNS_DELAYMICROS_POST_READ); //TODO use getMicrosElapse
-	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_READ); // tSCLK-NCS
+	_delayNanoseconds(ADNS_DELAYNANOS_NCSINACTIVE_POST_READ);
 	deselect();
 	delayMicroseconds(ADNS_DELAYMICROS_POST_READ);
 	return data;
@@ -374,124 +425,11 @@ void ADNS::writeRegister(const RegisterAddress address, const uint8_t data)
 {
 	// Send 7-bit address with msb=1 followed by data to write
 	select();
-	// waitNextTransactionDelay(); //TODO use getMicrosElapse
 	SPI.transfer((uint8_t)address | 0x80);
 	SPI.transfer(data);
-	// setNextTransactionDelay(ADNS_DELAYMICROS_POST_WRITE); //TODO getMicrosElapse
 	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_WRITE);
 	deselect();
 	delayMicroseconds(ADNS_DELAYMICROS_POST_WRITE);
-}
-
-// =============================================================================
-// Sensor Settings
-// =============================================================================
-void ADNS::setResolution(const uint16_t cpi)
-{
-	// Input may take any value between 50 and 8200 (will be rounded to nearest 50
-	// cpi)
-	uint16_t cpiValid =
-		constrain(cpi, ADNS_RESOLUTION_MIN_CPI, ADNS_RESOLUTION_MAX_CPI);
-	// uint8_t data = readRegister(RegisterAddress::Configuration_I);
-	// Keep current values from reserved bits (0x3f = B00111111) note: data sheet
-	// has error, mask is 0xFF uint8_t mask = ADNS_RESOLUTION_REGISTER_MASK; data
-	// = (data & ~mask) | (((uint8_t)(cpi / (uint16_t)ADNS_RESOLUTION_MIN_CPI)) &
-	// mask);
-	uint8_t data = (uint8_t)(cpiValid / (uint16_t)ADNS_RESOLUTION_MIN_CPI);
-	writeRegister(RegisterAddress::Configuration_I, data);
-	// Read back resolution from same register to confirm and store in cached
-	// property
-	getResolution(); // todo: check resolution matches assigned resolution ->
-					 // report
-}
-
-uint16_t ADNS::getResolution()
-{
-	uint8_t mask = ADNS_RESOLUTION_REGISTER_MASK;
-	uint8_t data = readRegister(RegisterAddress::Configuration_I);
-	data = data & mask;
-	uint16_t cpi = (uint16_t)data * (uint16_t)ADNS_RESOLUTION_MIN_CPI;
-	_resolution = cpi;
-	return cpi;
-}
-
-void ADNS::setMaxSamplePeriod(const uint16_t us)
-{
-	/* Configures sensor hardware -> sets the maximum frame period (minimum frame
-  rate) that can be selected by the automatic frame rate control, OR the actual
-  frame rate if the sensor is placed in manual frame rate control mode
-  */
-	uint8_t dataL, dataH;
-	uint16_t delayNumCyles = us * ADNS_CHIP_FREQ_MHZ;
-	dataL = lowByte(delayNumCyles);
-	dataH = highByte(delayNumCyles);
-	writeRegister(RegisterAddress::Frame_Period_Max_Bound_Lower, dataL);
-	writeRegister(RegisterAddress::Frame_Period_Max_Bound_Upper, dataH);
-	getMaxSamplePeriod();
-}
-
-uint16_t ADNS::getMaxSamplePeriod()
-{
-	uint8_t dataL, dataH;
-	dataH = readRegister(RegisterAddress::Frame_Period_Max_Bound_Upper);
-	dataL = readRegister(RegisterAddress::Frame_Period_Max_Bound_Lower);
-	uint16_t us = makeWord(dataH, dataL) / ADNS_CHIP_FREQ_MHZ;
-	_maxSamplePeriod = us;
-	return us;
-}
-
-void ADNS::setMinSamplePeriod(const uint16_t us)
-{
-	// todo ensure frameperiod_maxbound >= frameperiod_minbound + shutter_maxbound
-	uint8_t dataL, dataH;
-	uint16_t delayNumCyles = us * ADNS_CHIP_FREQ_MHZ;
-	dataL = lowByte(delayNumCyles);
-	dataH = highByte(delayNumCyles);
-	writeRegister(RegisterAddress::Frame_Period_Min_Bound_Lower, dataL);
-	writeRegister(RegisterAddress::Frame_Period_Min_Bound_Upper, dataH);
-	getMinSamplePeriod();
-}
-
-uint16_t ADNS::getMinSamplePeriod()
-{
-	uint8_t dataL, dataH;
-	dataH = readRegister(RegisterAddress::Frame_Period_Min_Bound_Upper);
-	dataL = readRegister(RegisterAddress::Frame_Period_Min_Bound_Lower);
-	uint16_t us = makeWord(dataH, dataL) / ADNS_CHIP_FREQ_MHZ;
-	_minSamplePeriod = us;
-	return us;
-}
-
-void ADNS::setMinSampleRate(const uint16_t hz)
-{
-	// Convenience function to call inverse function and pass to
-	// setMaxSamplePeriod()
-	uint16_t us = (uint16_t)(1000000UL / (uint32_t)hz);
-	setMaxSamplePeriod(us);
-	getMinSampleRate();
-}
-
-uint16_t ADNS::getMinSampleRate()
-{
-	uint16_t us = getMaxSamplePeriod();
-	uint16_t hz = (uint16_t)(1000000UL / (uint32_t)us);
-	_minSampleRate = hz;
-	return hz;
-}
-
-uint16_t ADNS::getSamplePeriod()
-{
-	uint8_t dataL, dataH;
-	dataH = readRegister(RegisterAddress::Frame_Period_Upper);
-	dataL = readRegister(RegisterAddress::Frame_Period_Lower);
-	uint16_t us = makeWord(dataH, dataL) / ADNS_CHIP_FREQ_MHZ;
-	return us;
-}
-
-uint16_t ADNS::getSampleRate()
-{
-	uint16_t us = getSamplePeriod();
-	return (uint16_t)(1000000UL / (uint32_t)us);
 }
 
 // =============================================================================
@@ -500,9 +438,11 @@ uint16_t ADNS::getSampleRate()
 void ADNS::setMotionSensePinInterruptMode(const int pin)
 {
 	_motionSensePin = pin;
-	// todo: attach interrupt to motion-sense pin
-	// pinMode(pin, INPUTPULLUP);
-	// attachInterrupt(digitalPinToInterrupt(pin), (*)(update), LOW)
+	// todo: set flag and use timer to poll if using this mode??
+	// pinModeFast(pin, INPUT_PULLUP);
+	// attachInterrupt(digitalPinToInterrupt(pin), triggerSampleCapture, LOW);
+	// todo: interrupt requires a static member function
+	// SPI.usingInterrupt(digitalPinToInterrupt(pin));
 }
 
 // =============================================================================
@@ -521,16 +461,13 @@ void ADNS::initialize()
 	{
 		// Power-Up Sensor & Set/Confirm Settings on Sensor Device
 		powerUpSensor();
-		setResolution(_resolution);
-		setMinSampleRate(_minSampleRate);
-		getMinSamplePeriod(); // todo update period and resolution in single fcn
+		setResolutionCountsPerInch(_resolutionCountsPerInch);
+		setMaxSamplePeriodUs(_maxSamplePeriodUs);
+		getMinSamplePeriodUs(); // todo update period and resolution in single fcn
 		delaySleepTimeout();
 		setMaxLiftDetectionThreshold();
 		_configuredFlag = true;
 	}
-	_currentPosition.x = 0;
-	_currentPosition.y = 0;
-	_currentPosition.t = 0;
 	_initializedFlag = true;
 }
 
@@ -568,7 +505,7 @@ void ADNS::resetSensor()
 	writeRegister(RegisterAddress::Power_Up_Reset, 0x5a);
 	delay(50);
 	writeRegister(RegisterAddress::Observation, 0x00);
-	delayMicroseconds(max(2000, _maxSamplePeriod));
+	delayMicroseconds(max(2000, _maxSamplePeriodUs));
 	// uint8_t obs = readRegister(RegisterAddress::Observation);
 	// should then check bits 0:5 are set
 	readRegister(RegisterAddress::Motion);
@@ -641,27 +578,4 @@ void ADNS::setMaxLiftDetectionThreshold()
 	data = (data & ~ADNS_LIFT_DETECTION_REGISTER_MASK) |
 		   (0xFF & ADNS_LIFT_DETECTION_REGISTER_MASK);
 	writeRegister(RegisterAddress::Lift_Detection_Thr, data);
-}
-
-// =============================================================================
-// Inline Convenience Functions
-// =============================================================================
-int16_t reg2Int16(uint8_t bL, uint8_t bH)
-{
-	int16_t iw16 = (int16_t)makeWord(bH, bL);
-	return convertTwosComplement(iw16);
-};
-int16_t convertTwosComplement(int16_t b)
-{
-	// Convert from 16-BIT 2's complement
-	if (b & 0x8000)
-	{
-		b = -1 * ((b ^ 0xffff) + 1);
-	}
-	return b;
-};
-adns_duration_t getMicrosElapse(adns_time_t t1, adns_time_t t2)
-{
-	adns_duration_t dt = t1 > t2 ? 1 + t1 + ~t2 : t2 - t1;
-	return dt;
 }
