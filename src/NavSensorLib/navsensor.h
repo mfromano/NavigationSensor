@@ -10,6 +10,16 @@
 #include <stdint.h>
 #include <Time.h>
 
+
+
+#define COMMAND(NAME)  { #NAME, NAME ## _command }
+// struct command commands[] =
+// {
+//   COMMAND (quit),
+//   COMMAND (help),
+//   …
+// };
+
 // =============================================================================
 // Data-Sample Template Structures
 // =============================================================================
