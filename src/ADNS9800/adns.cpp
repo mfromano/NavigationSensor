@@ -101,7 +101,7 @@ void ADNS::triggerSampleCapture()
 
 	// Update Elapsed-Microsecond-Since-Capture Counter
 	_sample.count++;
-	_sample.timestamp = _microsSinceCapture - _microsSinceStart; // position.t;
+	_sample.timestamp = _microsSinceStart; // position.t;
 	_microsSinceCapture -= dtLatch;
 
 	// Update Current Position Data
@@ -152,7 +152,7 @@ position_t ADNS::readPosition(const unit_specification_t unit) const
 	// Apply Conversion Coefficient
 	p.x = (float)position.x * distancePerCount;
 	p.y = (float)position.y * distancePerCount;
-	p.t = position.t * timePerCount;
+	p.t = (float)position.t * timePerCount;
 	return p;
 }
 
@@ -219,7 +219,7 @@ void ADNS::printLastMotion()
 	String tUnit;
 
 	// Print Displacement
-	unitType = {Unit::Distance::MICROMETER, Unit::Time::MICROSECOND};
+	unitType = {Unit::Distance::MILLIMETER, Unit::Time::MILLISECOND};
 	xyUnit = Unit::getAbbreviation(unitType.distance);
 	tUnit = Unit::getAbbreviation(unitType.time);
 	displacement_t u = readDisplacement(unitType);
@@ -228,7 +228,7 @@ void ADNS::printLastMotion()
 	Serial.print(",");
 	Serial.print(u.dy, 3);
 	Serial.print(",");
-	Serial.print(u.dt);
+	Serial.print(u.dt, 3);
 	Serial.println(">\t");
 
 	// Print Position
@@ -241,7 +241,7 @@ void ADNS::printLastMotion()
 	Serial.print(",");
 	Serial.print(p.y, 3);
 	Serial.print(",");
-	Serial.print(p.t);
+	Serial.print(p.t, 3);
 	Serial.println(">\t");
 
 	// Print Velocity
