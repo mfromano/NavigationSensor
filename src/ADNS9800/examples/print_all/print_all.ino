@@ -3,7 +3,7 @@
   main.cpp
 
 */
-#include <glcd_delay.h>
+#include <Arduino.h>
 
 // Arduino Includes
 #include <SPI.h>
@@ -23,8 +23,9 @@ adns_readout_t index;
 adns_readout_t readout;
 
 // Declare Test Functions
-// void testSingleRegisterRead();
-// void testBurst();
+void testSingleRegisterRead();
+void testBurst();
+void printLag();
 
 // =============================================================================
 //   INITIALIZATION
