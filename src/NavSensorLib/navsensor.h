@@ -1,4 +1,4 @@
- /*
+/*
   navsensor.h
   -> Common include for NavigationSensor-type devices
 */
@@ -42,14 +42,14 @@ typedef struct
 {
     float x;
     float y;
-    time_t t; //todo: 64-bit {sec,nsec}
+    float t; //todo: 64-bit {sec,nsec}
 } position_t;
 
 typedef struct
 {
     float dx;
     float dy;
-    time_t dt; //todo change to duration_t
+    float dt; //todo change to duration_t
 } displacement_t;
 
 typedef vec2_cartesian<float> velocity_cartesian_t;
@@ -256,7 +256,6 @@ typedef struct
 static constexpr unit_specification_t DEFAULT_UNIT = {DEFAULT_DISTANCE_UNIT, DEFAULT_TIME_UNIT};
 
 #endif
-
 
 // ADAFRUIT_SENSOR UNIFIED
 // bool getEvent(sensors_event_t *event)
