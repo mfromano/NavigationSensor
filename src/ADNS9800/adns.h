@@ -14,6 +14,9 @@
 #endif
 #include <SPI.h>
 #include <stdint.h>
+#include <elapsedMillis.h>
+#include <glcd_delay.h>
+#include <digitalWriteFast.h>
 
 // Sensor Register Include - ADNS-9800
 #include "adns_config.h"
@@ -35,10 +38,11 @@ class ADNS
 	bool begin(const uint16_t resolutionCPI = ADNS_DEFAULT_SENSOR_RESOLUTION,
 			   const uint16_t minSampleRateHz = ADNS_DEFAULT_SENSOR_MINSAMPLERATE);
 
+	String getName(); // { return String(ADNS_NAME).concat(String("_pin")).concat(String(_chipSelectPin, DEC)); };
+
 	// Trigger Start, Capture, & Readout
 	void triggerAcquisitionStart();
 	void triggerSampleCapture();
-	void triggerPositionUpdate();
 	void triggerAcquisitionStop();
 	//todo -> inline static void these for responsiveness from ISRs
 
@@ -46,7 +50,9 @@ class ADNS
 	displacement_t readDisplacement(const unit_specification_t = DEFAULT_UNIT) const;
 	position_t readPosition(const unit_specification_t = DEFAULT_UNIT) const;
 	velocity_t readVelocity(const unit_specification_t = DEFAULT_UNIT) const;
-	void printLast();
+	adns_additional_info_t readAdditionalInfo() const;
+	void printLastMotion();
+	void printLastAdditionalInfo();
 
 	// Sensor Settings
 	void setResolutionCountsPerInch(const uint16_t cpi);
@@ -68,15 +74,6 @@ class ADNS
 
 	// Mode Settings
 	void setMotionSensePinInterruptMode(const int pin);
-	// todo mode: accumulate or buffer, rising? falling?
-
-	// Unit Settings for read___() functions
-	void setDistanceUnit(const Unit::Distance unit) { _unitSpec.distance = unit; };
-	void setTimeUnit(const Unit::Time unit) { _unitSpec.time = unit; };
-	void setUnits(const unit_specification_t unitSpec) { _unitSpec = unitSpec; };
-	inline Unit::Distance getDistanceUnit() { return _unitSpec.distance; };
-	inline Unit::Time getTimeUnit() { return _unitSpec.time; };
-	inline unit_specification_t getUnits() { return _unitSpec; };
 
   protected:
 	// Configuration
@@ -103,34 +100,20 @@ class ADNS
 
 	// Current Sensor Settings
 	String _firmwareRevision;
-	uint16_t _resolutionCountsPerInch;				// Counts-Per-Inch
-	uint16_t _maxSamplePeriodUs;					// Microseconds
-	uint16_t _minSamplePeriodUs;					// Microseconds
-	adns_time_t _acquisitionStartMicrosCountOffset; // Microseconds
+	uint16_t _resolutionCountsPerInch; // Counts-Per-Inch
+	uint16_t _maxSamplePeriodUs;	   // Microseconds
+	uint16_t _minSamplePeriodUs;	   // Microseconds
 
 	// Unit Conversions
 	float _resolutionInchPerCount;
-	unit_specification_t _unitSpec = DEFAULT_UNIT;
+	// // unit_specification_t _unitSpec = DEFAULT_UNIT;
 
 	// Readout Data
-	adns_capture_t _currentCapture;
-	adns_displacement_t _currentDisplacement;
-	adns_position_t _currentPosition;
-	adns_sample_t _lastSample; //todo use CircularBuffer, push, implement available()
-
-// Static Settings
-#ifdef ADNS_READMODE_BURST
-	static const uint8_t _motionLatchRegAddr = (uint8_t)RegisterAddress::Motion_Burst;
-	static const bool _burstModeFlag = ADNS_READMODE_BURST;
-#else
-	static const uint8_t _motionLatchRegAddr = (uint8_t)RegisterAddress::Motion;
-	static const bool _burstModeFlag = false;
-#endif
-#ifdef ADNS_POSITIONUPDATE_AUTOMATIC
-	static const bool _autoUpdateFlag = ADNS_POSITIONUPDATE_AUTOMATIC;
-#else
-	static const bool _autoUpdateFlag = false;
-#endif
+	elapsedMicros _microsSinceStart;
+	elapsedMicros _microsSinceCapture;
+	adns_position_t _position;
+	adns_readout_t _readout;
+	adns_sample_t _sample;
 };
 
 #endif

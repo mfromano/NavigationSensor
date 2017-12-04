@@ -6,13 +6,6 @@
 */
 
 #include "adns.h"
-#include <elapsedMillis.h>
-#include <digitalWriteFast.h>
-
-#define DELAY_450NS asm volatile("nop")
-#define DELAY_1uS \
-	DELAY_450NS;  \
-	DELAY_450NS;
 
 // =============================================================================
 //   Setup
@@ -23,6 +16,14 @@ bool ADNS::begin(const uint16_t cpi, const uint16_t hz)
 	_maxSamplePeriodUs = (uint16_t)(1000000UL / (uint32_t)hz);
 	initialize();
 	return true;
+}
+
+String ADNS::getName()
+{
+	String chip = String(ADNS_NAME);
+	String pin = String("_pin") + String(_chipSelectPin, DEC);
+	String name = chip + pin;
+	return name;
 }
 
 // =============================================================================
@@ -38,133 +39,80 @@ void ADNS::triggerAcquisitionStart()
 		triggerAcquisitionStop();
 
 	// Flush Sample Registers -> Write 0 to Motion Register
+	noInterrupts();
 	select();
-	SPI.transfer((uint8_t)RegisterAddress::Motion | 0x80);
-	SPI.transfer(0x00);
+	// // SPI.transfer((uint8_t)RegisterAddress::Motion | 0x80);
+	// // SPI.transfer(0x00);
+	SPI.transfer((uint8_t)RegisterAddress::Motion & 0x7f);
 
 	// Set Start-Time Microsecond Offset
-	adns_time_t us = micros();
-	adns_capture_t &capture = _currentCapture;
-	capture.startTime = 0;
-	capture.endTime = 0; // todo
-	capture.readout.motion = 0x00;
-	_acquisitionStartMicrosCountOffset = us;
+	_microsSinceStart = 0;
+	_microsSinceCapture = _microsSinceStart;
 
-	// Standard Delays
-	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_WRITE);
+	// Reset Current Position
+	_position.x = 0;
+	_position.y = 0;
+	_position.t = 0;
+
+	// Reset Current Raw-Readout & Sample Buffers with Fresh Data
+	static adns_readout_t freshReadout;
+	static adns_sample_t freshSample;
+	_readout = freshReadout;
+	_sample = freshSample;
+
+	// Release SPI Bus and Interrupts Hold
 	deselect();
-	delayMicroseconds(ADNS_DELAYMICROS_POST_WRITE);
+	interrupts();
 
 	// Set Flag to Indicate Running State
 	_runningFlag = true;
 }
 
-// Read from ADNS9800 Sensor and Update _currentCapture & _currentDisplacement
+// Read from ADNS9800 Sensor and Update _currentCapture & _sample
 void ADNS::triggerSampleCapture()
 {
 	// Trigger Start if Not Running
 	if (!_runningFlag)
 		triggerAcquisitionStart();
 
-	// Timestamps
-	adns_time_t usStart, usFinish;
-	adns_duration_t dt;
-
-	// Get Local References to Current Data Structures
-	adns_capture_t &capture = _currentCapture;
-	adns_displacement_t &displacement = _currentDisplacement;
-	adns_readout_t &readout = capture.readout;
-
-	// todo noInterrupts();
-
-	// Copy Start-Time from Prior Sample Finish-Time
-	capture.startTime = capture.endTime;
-	usStart = capture.startTime + _acquisitionStartMicrosCountOffset;
-
-	// Run Read-Register Sequence with Timestamp Inserted Directly after Address
+	// Disable Interrupts and Lock SPI Bus
+	noInterrupts();
 	select();
 
 	// Read from Motion or Motion_Burst Address to Latch Data
-	SPI.transfer(ADNS::_motionLatchRegAddr & 0x7f);
+	SPI.transfer((byte)RegisterAddress::Motion_Burst & 0x7f);
 
-	// Record Sample Finish-Time
-	usFinish = micros();
-	dt = getMicrosElapse(usStart, usFinish);
-	capture.endTime = capture.startTime + dt;
+	// Latch Elapsed Microseconds at End Of Sample
+	uint32_t dtLatch = _microsSinceCapture;
 
 	// Read Latched Data from Sensor Registers
-	if (ADNS::_burstModeFlag)
+	while ((_microsSinceCapture - dtLatch) < _minSamplePeriodUs)
 	{
-		while (getMicrosElapse(capture.endTime, micros()) < _minSamplePeriodUs)
-		{
-		};
-		SPI.transfer(readout.data, adns_readout_max_size);
+	};
+	SPI.transfer(_readout.data, adns_readout_max_size);
 
-		// Release SPI Bus
-		deselect();
-	}
-	else
-	{
-		// Read Motion-Register
-		delayMicroseconds(ADNS_DELAYMICROS_READ_ADDR_DATA);
-		uint8_t motion = SPI.transfer(0);
-		delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_READ);
-		deselect();
-		delayMicroseconds(ADNS_DELAYMICROS_POST_READ);
-
-		// Update Current Sample Displacement Register Values
-		readout.motion = motion;
-		if (bit_is_set(motion, 7))
-		{
-			readout.dxL = readRegister(RegisterAddress::Delta_X_L);
-			readout.dxH = readRegister(RegisterAddress::Delta_X_H);
-			readout.dyL = readRegister(RegisterAddress::Delta_Y_L);
-			readout.dyH = readRegister(RegisterAddress::Delta_Y_H);
-		}
-		else
-		{
-			readout.dxL = 0x00;
-			readout.dxH = 0x00;
-			readout.dyL = 0x00;
-			readout.dyH = 0x00;
-		}
-	}
+	// Release SPI Bus
+	deselect();
 
 	// Update Displacement
-	displacement.dx += ((int16_t)(readout.dxL) | ((int16_t)(readout.dxH) << 8));
-	displacement.dy += ((int16_t)(readout.dyL) | ((int16_t)(readout.dyH) << 8));
-	displacement.dt += ((capture.endTime - capture.startTime));
+	_sample.displacement.dx = ((int16_t)(_readout.dxL) | ((int16_t)(_readout.dxH) << 8));
+	_sample.displacement.dy = ((int16_t)(_readout.dyL) | ((int16_t)(_readout.dyH) << 8));
+	_sample.displacement.dt = dtLatch; //((capture.endTime - capture.startTime));
 
-	if (_autoUpdateFlag)
-		triggerPositionUpdate();
-
-	// todo interrupts();
-}
-
-// Update _currentPosition and Reset _currentDisplacement
-void ADNS::triggerPositionUpdate()
-{
-	// Local References
-	adns_sample_t &sample = _lastSample;
-	adns_position_t &position = _currentPosition;
-	adns_displacement_t &displacement = _currentDisplacement;
-
-	// Set Timestamp with prior Position Time
-	noInterrupts();
-	sample.timestamp = position.t;
+	// Update Elapsed-Microsecond-Since-Capture Counter
+	_sample.count++;
+	_sample.timestamp = _microsSinceCapture - _microsSinceStart; // position.t;
+	_microsSinceCapture -= dtLatch;
 
 	// Update Current Position Data
-	position.x += displacement.dx;
-	position.y += displacement.dy;
-	position.t += displacement.dt;
+	_position.x += _sample.displacement.dx;
+	_position.y += _sample.displacement.dy;
+	_position.t += _sample.displacement.dt;
 
-	// Copy & Reset Displacement
-	sample.displacement = displacement;
-	displacement = {0, 0, 0};
 	interrupts();
 }
 
-void ADNS::triggerAcquisitionStop() { _runningFlag = false; }
+void ADNS::triggerAcquisitionStop() { _runningFlag = false; } //todo test shutDownSensor()
 
 // =============================================================================
 // Data-Sample Conversion & Access
@@ -173,7 +121,7 @@ void ADNS::triggerAcquisitionStop() { _runningFlag = false; }
 displacement_t ADNS::readDisplacement(const unit_specification_t unit) const
 {
 	// Retrieve last displacement sample
-	const adns_displacement_t &displacement = _lastSample.displacement;
+	const adns_displacement_t &displacement = _sample.displacement;
 
 	// Initialize sample return structure
 	displacement_t u;
@@ -192,7 +140,7 @@ displacement_t ADNS::readDisplacement(const unit_specification_t unit) const
 position_t ADNS::readPosition(const unit_specification_t unit) const
 {
 	// Retrieve last displacement sample
-	const adns_position_t &position = _currentPosition;
+	const adns_position_t &position = _position;
 
 	// Initialize sample return structure
 	position_t p;
@@ -211,7 +159,7 @@ position_t ADNS::readPosition(const unit_specification_t unit) const
 velocity_t ADNS::readVelocity(const unit_specification_t unit) const
 {
 	// Retrieve last displacement sample
-	const adns_displacement_t &displacement = _lastSample.displacement;
+	const adns_displacement_t &displacement = _sample.displacement;
 
 	// Initialize sample return structure
 	velocity_t v;
@@ -227,55 +175,113 @@ velocity_t ADNS::readVelocity(const unit_specification_t unit) const
 	return v;
 }
 
-void ADNS::printLast()
+adns_additional_info_t ADNS::readAdditionalInfo() const
 {
+	// Initialize output structure and ref to most recent raw readout
+	adns_additional_info_t info;
+	const adns_readout_t &r = _readout;
 
-	triggerSampleCapture();
-	if (!_autoUpdateFlag)
-	{
-		triggerPositionUpdate();
-	}
-	displacement_t u = readDisplacement();
-	position_t p = readPosition();
-	velocity_t v = readVelocity();
+	// Status in Raw Bit-Fields from Sensor Registers
+	info.status.motion = r.motion;
+	info.status.observation = r.observation;
 
+	// Pixel statistics from image sensor
+	static const float PXSUM_UPPER7BITS_TO_PIXELMEAN = (1 / 1.76);
+	info.pixel.min = r.minPixel;
+	info.pixel.mean = (uint8_t)((float)r.pixelSum * PXSUM_UPPER7BITS_TO_PIXELMEAN);
+	info.pixel.max = r.maxPixel;
+	info.pixel.features = r.surfaceQuality;
+
+	// Period of Image Sensor Operation - Frame & Shutter (variable by default)
+	static const float MICROS_PER_TICK = 1.0 / ADNS_CHIP_FREQ_MHZ;
+	info.period.shutter = (float)makeWord(r.shutterPeriodH, r.shutterPeriodL) * MICROS_PER_TICK; // microseconds
+	info.period.frame = (float)makeWord(r.framePeriodH, r.framePeriodL) * MICROS_PER_TICK;		 // microseconds
+
+	// Return additional info structure
+	return info;
+}
+
+void ADNS::printLastMotion()
+{
+	// Ensure Serial Stream has Started
 	if (!Serial)
 	{
 		Serial.begin(115200);
 		delay(50);
 	}
 	// Print Timestamp of Last Sample
-	Serial.println(_lastSample.timestamp);
+	Serial.print("\ntimestamp [us]:\t");
+	Serial.println(_sample.timestamp);
 
-	const unit_specification_t unitType = ADNS::getUnits();
-	const String xyUnit = Unit::getAbbreviation(unitType.distance);
-	const String tUnit = Unit::getAbbreviation(unitType.time);
+	// Initialize Unit-Specification and Description Variables
+	unit_specification_t unitType;
+	String xyUnit;
+	String tUnit;
 
 	// Print Displacement
-	// // Serial.print("<dx,dy,dt> [um,um,us]:\t<");
+	unitType = {Unit::Distance::MICROMETER, Unit::Time::MICROSECOND};
+	xyUnit = Unit::getAbbreviation(unitType.distance);
+	tUnit = Unit::getAbbreviation(unitType.time);
+	displacement_t u = readDisplacement(unitType);
 	Serial.print("<dx,dy,dt> [" + xyUnit + "," + xyUnit + "," + tUnit + "]\t<");
-	Serial.print(u.dx);
+	Serial.print(u.dx, 3);
 	Serial.print(",");
-	Serial.print(u.dy);
+	Serial.print(u.dy, 3);
 	Serial.print(",");
 	Serial.print(u.dt);
 	Serial.println(">\t");
 
 	// Print Position
+	unitType = {Unit::Distance::MILLIMETER, Unit::Time::MILLISECOND};
+	xyUnit = Unit::getAbbreviation(unitType.distance);
+	tUnit = Unit::getAbbreviation(unitType.time);
+	position_t p = readPosition(unitType);
 	Serial.print("<x,y,t> [" + xyUnit + "," + xyUnit + "," + tUnit + "]\t<");
-	Serial.print(p.x);
+	Serial.print(p.x, 3);
 	Serial.print(",");
-	Serial.print(p.y);
+	Serial.print(p.y, 3);
 	Serial.print(",");
 	Serial.print(p.t);
 	Serial.println(">\t");
 
 	// Print Velocity
+	unitType = {Unit::Distance::METER, Unit::Time::SECOND};
+	xyUnit = Unit::getAbbreviation(unitType.distance);
+	tUnit = Unit::getAbbreviation(unitType.time);
+	velocity_t v = readVelocity(unitType);
 	Serial.print("<Vx,Vy> [" + xyUnit + "/" + tUnit + "," + xyUnit + "/" + tUnit + "]\t<");
-	Serial.print(v.x);
+	Serial.print(v.x, 3);
 	Serial.print(",");
-	Serial.print(v.y);
+	Serial.print(v.y, 3);
 	Serial.println(">\t");
+}
+
+void ADNS::printLastAdditionalInfo()
+{
+	// Read additional info
+	const adns_additional_info_t info = readAdditionalInfo();
+
+	// Status in Raw Bit-Fields from Sensor Registers
+	Serial.print("\tmotion: ");
+	Serial.print(info.status.motion, HEX);
+	Serial.print("\tobservation: ");
+	Serial.println(info.status.observation, HEX);
+
+	// Pixel statistics from image sensor
+	Serial.print("\tmin: ");
+	Serial.print(info.pixel.min);
+	Serial.print("\tmean: ");
+	Serial.print(info.pixel.mean);
+	Serial.print("\tmax: ");
+	Serial.print(info.pixel.max);
+	Serial.print("\tfeatures: ");
+	Serial.println(info.pixel.features);
+
+	// Period of Image Sensor Operation - Frame & Shutter (variable by default)
+	Serial.print("\tshutter: ");
+	Serial.print(info.period.shutter);
+	Serial.print("\tframe: ");
+	Serial.println(info.period.frame);
 }
 
 // =============================================================================
@@ -387,7 +393,7 @@ void ADNS::select()
 										 ADNS_SPI_DATA_MODE));
 		digitalWriteFast(_chipSelectPin, LOW);
 		_selectedFlag = 1;
-		delayMicroseconds(1);
+		_delayNanoseconds(ADNS_DELAYNANOS_NCS_SCLKACTIVE);
 	}
 }
 
@@ -406,12 +412,10 @@ uint8_t ADNS::readRegister(const RegisterAddress address)
 {
 	// Send 7-bit address with msb=0, clock for 1 uint8_t to receive 1 uint8_t
 	select();
-	// waitNextTransactionDelay(); //TODO use getMicrosElapse
 	SPI.transfer((uint8_t)address & 0x7f);
 	delayMicroseconds(ADNS_DELAYMICROS_READ_ADDR_DATA); // tSRAD
 	uint8_t data = SPI.transfer(0);
-	// setNextTransactionDelay(ADNS_DELAYMICROS_POST_READ); //TODO use getMicrosElapse
-	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_READ); // tSCLK-NCS
+	_delayNanoseconds(ADNS_DELAYNANOS_NCSINACTIVE_POST_READ);
 	deselect();
 	delayMicroseconds(ADNS_DELAYMICROS_POST_READ);
 	return data;
@@ -421,10 +425,8 @@ void ADNS::writeRegister(const RegisterAddress address, const uint8_t data)
 {
 	// Send 7-bit address with msb=1 followed by data to write
 	select();
-	// waitNextTransactionDelay(); //TODO use getMicrosElapse
 	SPI.transfer((uint8_t)address | 0x80);
 	SPI.transfer(data);
-	// setNextTransactionDelay(ADNS_DELAYMICROS_POST_WRITE); //TODO getMicrosElapse
 	delayMicroseconds(ADNS_DELAYMICROS_NCSINACTIVE_POST_WRITE);
 	deselect();
 	delayMicroseconds(ADNS_DELAYMICROS_POST_WRITE);
@@ -466,9 +468,6 @@ void ADNS::initialize()
 		setMaxLiftDetectionThreshold();
 		_configuredFlag = true;
 	}
-	_currentPosition.x = 0;
-	_currentPosition.y = 0;
-	_currentPosition.t = 0;
 	_initializedFlag = true;
 }
 
