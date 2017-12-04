@@ -12,6 +12,7 @@
 // Include Common NavigationSensor Library
 // // #include "NavigationSensorLib\NavigationSensor.h" //todo: make common
 // settings or functions
+#define ADNS_NAME ("ADNS9800")
 
 // Include Updateable File with ADNS Sensor Firmware
 #ifndef ADNS_FIRMWARE_INCLUDE_FILENAME
@@ -30,17 +31,14 @@
 #define ADNS_MAX_SAMPLE_RATE_HZ 12000
 #define ADNS_CHIP_FREQ_MHZ 50
 
-// Modes
-#define ADNS_READMODE_BURST 1
-#define ADNS_POSITIONUPDATE_AUTOMATIC 1
-
 // SPI Communication Timing
 #define ADNS_DELAYMICROS_POST_READ 20
 #define ADNS_DELAYMICROS_POST_WRITE 120
 #define ADNS_DELAYMICROS_POST_RESET 30000
 #define ADNS_DELAYMICROS_READ_ADDR_DATA 100
-#define ADNS_DELAYMICROS_NCSINACTIVE_POST_READ 1 // 120ns
 #define ADNS_DELAYMICROS_NCSINACTIVE_POST_WRITE 20
+#define ADNS_DELAYNANOS_NCSINACTIVE_POST_READ 120 // 120ns
+#define ADNS_DELAYNANOS_NCS_SCLKACTIVE 120
 // todo: macro functions to implement SPI_DELAY_****
 //#define ADNS_SQUAL2NUMFEATURES(v)	((uint32_t) v* 4)
 
@@ -59,6 +57,11 @@
 // Default Sensor Configuration Settings (common)
 #define ADNS_DEFAULT_SENSOR_RESOLUTION 3400
 #define ADNS_DEFAULT_SENSOR_MINSAMPLERATE 1000
+
+// SPI Alternate Pins [SS, MOSI, MISO, SCK]
+// uno and teensy: [10, 11, 12, 13]
+// teensy alternate: [__, 7, 8, 14]
+// SPI.setMOSI(7), SPI.setMISO(8), and SPI.setSCK(14)
 
 // External Constants for Firmware
 extern const unsigned short firmware_length;
