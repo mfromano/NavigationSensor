@@ -6,17 +6,12 @@
 #ifndef ADNS_h
 #define ADNS_h
 
-#if ARDUINO >= 100
 #include <Arduino.h>
-#include <Print.h>
-#else
-#include <WProgram.h>
-#endif
 #include <SPI.h>
 #include <stdint.h>
 #include <elapsedMillis.h>
 #include <glcd_delay.h>
-#include <digitalWriteFast.h>
+#include <DigitalIO.h>
 
 // Sensor Register Include - ADNS-9800
 #include "adns_config.h"
