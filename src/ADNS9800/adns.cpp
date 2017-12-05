@@ -50,15 +50,28 @@ void ADNS::triggerAcquisitionStart()
 	_microsSinceCapture = _microsSinceStart;
 
 	// Reset Current Position
-	_position.x = 0;
-	_position.y = 0;
-	_position.t = 0;
+	// _position.x = 0;
+	// _position.y = 0;
+	// _position.t = 0;
 
 	// Reset Current Raw-Readout & Sample Buffers with Fresh Data
-	static adns_readout_t freshReadout;
-	static adns_sample_t freshSample;
-	_readout = freshReadout;
-	_sample = freshSample;
+	// static adns_readout_t freshReadout;
+	// static adns_sample_t freshSample;
+	// _position.t = 0;
+	// _readout = freshReadout;
+	// _sample = freshSample;
+
+	memset(&_position, 0, sizeof(_position));
+	memset(&_readout, 0, sizeof(_readout));
+	memset(&_sample, 0, sizeof(_sample));
+
+	// volatile void *ptr;
+	// ptr = &_position;
+	// memset(ptr, 0, sizeof(*ptr));
+	// ptr = &_readout;
+	// memset(ptr, 0, sizeof(*ptr));
+	// ptr = &_sample;
+	// memset(ptr, 0, sizeof(*ptr));
 
 	// Release SPI Bus and Interrupts Hold
 	deselect();
@@ -381,7 +394,7 @@ void ADNS::select()
 	{
 		SPI.beginTransaction(SPISettings(ADNS_SPI_MAX_SPEED, ADNS_SPI_BIT_ORDER,
 										 ADNS_SPI_DATA_MODE));
-		digitalWriteFast(_chipSelectPin, LOW);
+		fastDigitalWrite(_chipSelectPin, LOW);
 		_selectedFlag = 1;
 		_delayNanoseconds(ADNS_DELAYNANOS_NCS_SCLKACTIVE);
 	}
@@ -392,7 +405,7 @@ void ADNS::deselect()
 	if (_selectedFlag == true)
 	{
 		// delayMicroseconds(1); // tSCLK-NCS
-		digitalWriteFast(_chipSelectPin, HIGH);
+		fastDigitalWrite(_chipSelectPin, HIGH);
 		SPI.endTransaction();
 		_selectedFlag = 0;
 	}
@@ -429,7 +442,7 @@ void ADNS::setMotionSensePinInterruptMode(const int pin)
 {
 	_motionSensePin = pin;
 	// todo: set flag and use timer to poll if using this mode??
-	// pinModeFast(pin, INPUT_PULLUP);
+	// fastPinMode(pin, INPUT_PULLUP);
 	// attachInterrupt(digitalPinToInterrupt(pin), triggerSampleCapture, LOW);
 	// todo: interrupt requires a static member function
 	// SPI.usingInterrupt(digitalPinToInterrupt(pin));
@@ -443,7 +456,7 @@ void ADNS::initialize()
 	if (!_initializedFlag)
 	{
 		// Set up Serial Peripheral Interface (SPI) & specified chip-select pin
-		pinModeFast(_chipSelectPin, OUTPUT);
+		fastPinMode(_chipSelectPin, OUTPUT);
 		SPI.begin();
 		delay(100);
 	}

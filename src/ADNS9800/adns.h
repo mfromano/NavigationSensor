@@ -11,7 +11,7 @@
 #include <stdint.h>
 #include <elapsedMillis.h>
 #include <glcd_delay.h>
-#include <digitalWriteFast.h>
+#include <DigitalIO.h>
 
 // Sensor Register Include - ADNS-9800
 #include "adns_config.h"
@@ -106,9 +106,9 @@ class ADNS
 	// Readout Data
 	elapsedMicros _microsSinceStart;
 	elapsedMicros _microsSinceCapture;
-	volatile adns_position_t _position;
-	volatile adns_readout_t _readout;
-	volatile adns_sample_t _sample;
+	adns_position_t _position;
+	adns_readout_t _readout;
+	adns_sample_t _sample;
 };
 
 #endif
