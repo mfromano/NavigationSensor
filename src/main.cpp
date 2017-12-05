@@ -9,6 +9,7 @@
 #include <SPI.h>
 #include <elapsedMillis.h>
 #include <CircularBuffer.h>
+#include <DigitalIO.h>
 // #include <IntervalTimer.h>
 // IntervalTimer timer;
 // timer.priority(0);
@@ -21,32 +22,53 @@
 #include "ADNS9800\ADNS.h"
 
 // Pin Settings
-#define CHIPSELECT_PIN 4
+#define CS_PIN_A 4
+#define CS_PIN_B 5
 
-// Timing Settings (shooting for 480 fps minimum)
+// Timing Settings (shooting for 480 fps minimum, sync with camera is nominal at this juncture)
 #define CAMERA_FPS 40
 #define SAMPLES_PER_CAMERA_FRAME 12
+
+// Buffer Size (comment out CHAR_BUFFER_SIZE_FIXED to try variable size mode)
 #define CHAR_BUFFER_NUM_BYTES 44
-#define CHAR_BUFFER_SIZE_FIXED
 
 // Delimiters and Terminators
 #define ID_DATA_DELIM ':'
 #define DATA_DELIM ','
-#define MSG_TERMINATOR '\r'
+#define MSG_TERMINATOR '\t'
 
-// Create a Sensor Object with Specified Slave-Select Pin
-ADNS sensor(CHIPSELECT_PIN);
+// Define Left-Right Sensor Pair Structure
+typedef struct
+{
+    ADNS &left;
+    ADNS &right;
+} sensor_pair_t;
+
+// Create Sensor Objects with Specified Slave-Select Pins
+ADNS adnsA(CS_PIN_A);
+ADNS adnsB(CS_PIN_B);
+sensor_pair_t sensor = {adnsA, adnsB};
+typedef struct
+{
+    char id = 'L';
+    displacement_t p;
+} labeled_sample_t;
+
+// Specify some Constants for Timing and Unit Conversion/Reporting
 const unit_specification_t units = {Unit::Distance::MICROMETER, Unit::Time::MILLISECOND};
+const int32_t DISPLACEMENT_FPS = (CAMERA_FPS * SAMPLES_PER_CAMERA_FRAME);
+const uint32_t usLoop = 1e6 / DISPLACEMENT_FPS;
 
-const uint32_t usLoop = 1e6 / (CAMERA_FPS * SAMPLES_PER_CAMERA_FRAME);
+// Initialize microsecond counter and sample buffer
 elapsedMicros usCnt;
-
-CircularBuffer<displacement_t, 12> buf;
+CircularBuffer<labeled_sample_t, 3> bufA;
+CircularBuffer<labeled_sample_t, 3> bufB;
 
 // Declare Test Functions
-void transmitDisplacementString(const displacement_t p, String id = "L");
-void transmitDisplacementChar(const displacement_t p, const char id = 'L');
-void captureDisplacement();
+static inline void sendAnyUpdate();
+static inline void captureDisplacement();
+void transmitDisplacementString(const labeled_sample_t);
+void transmitDisplacementChar(const labeled_sample_t);
 
 // =============================================================================
 //   INITIALIZATION
@@ -61,13 +83,16 @@ void setup()
     }
     delay(10);
 
-    // Begin Sensor
-    sensor.begin();
+    // Begin Sensors
+    sensor.left.begin();
+    delay(30);
+    sensor.right.begin();
     delay(30);
 
     // Start Acquisition
-    sensor.triggerAcquisitionStart();
     usCnt = 0;
+    sensor.left.triggerAcquisitionStart();
+    sensor.right.triggerAcquisitionStart();
 };
 
 // =============================================================================
@@ -77,38 +102,37 @@ void loop()
 {
     while (usCnt < usLoop)
     {
-        // Print Velocity
-        while (!buf.isEmpty())
-        {
-            displacement_t p = buf.shift();
-#ifdef CHAR_BUFFER_SIZE_FIXED
-            transmitDisplacementChar(p);
-#else
-            transmitDisplacementString(p);
-#endif
-        }
+        sendAnyUpdate();
     }
+    //todo fastDigitalWrite(syncPin, HIGH);
     captureDisplacement();
     usCnt -= usLoop; // usCnt = totalLag?
+    //todo fastDigitalWrite(syncPin, LOW);
 }
 
-//  Variable-Size Conversion to ASCII Strings
-void transmitDisplacementString(const displacement_t p, String id)
+static inline void sendAnyUpdate()
 {
-    // Precision
-    const unsigned char decimalPlaces = 3;
+    // Print Velocity
+    while ((!bufA.isEmpty()) && (!(bufB.isEmpty())))
+    {
+        transmitDisplacementChar(bufA.shift());
+        transmitDisplacementChar(bufB.shift());
+        Serial.write('\r');
+    }
+}
 
-    // Convert to String class
-    const String dx = String(p.dx, decimalPlaces);
-    const String dy = String(p.dy, decimalPlaces);
-    const String dt = String(p.dt, decimalPlaces);
-
-    // Print ASCII Strings
-    Serial.print(id + ID_DATA_DELIM + dx + DATA_DELIM + dy + DATA_DELIM + dt + MSG_TERMINATOR);
+static inline void captureDisplacement()
+{
+    sensor.left.triggerSampleCapture();
+    sensor.right.triggerSampleCapture();
+    const labeled_sample_t sampleA = {'L', sensor.left.readDisplacement(units)};
+    const labeled_sample_t sampleB = {'R', sensor.right.readDisplacement(units)};
+    bufA.push(sampleA);
+    bufB.push(sampleB);
 }
 
 // Fixed-Size Buffer Conversion to ASCII char array
-void transmitDisplacementChar(const displacement_t p, const char id)
+void transmitDisplacementChar(const labeled_sample_t sample)
 {
     // Precision and Max-Width of String Representation of Floats
     static const unsigned char decimalPlaces = 3;
@@ -123,29 +147,36 @@ void transmitDisplacementChar(const displacement_t p, const char id)
     memset(cbuf, (int)(' '), CHAR_BUFFER_NUM_BYTES);
 
     // Set first Char with ID
-    cbufArray[0] = id;
+    cbufArray[0] = sample.id;
     cbufArray[1] = ID_DATA_DELIM;
 
     // Jump by Increment and Fill with Limited Width Float->ASCII
     size_t offset = 2;
-    dtostrf(p.dx, width, decimalPlaces, cbuf + offset);
+    dtostrf(sample.p.dx, width, decimalPlaces, cbuf + offset);
     cbufArray[offset + width] = DATA_DELIM;
     offset += increment;
-    dtostrf(p.dy, width, decimalPlaces, cbuf + offset);
+    dtostrf(sample.p.dy, width, decimalPlaces, cbuf + offset);
     cbufArray[offset + width] = DATA_DELIM;
     offset += increment;
-    dtostrf(p.dt, width, decimalPlaces, cbuf + offset);
+    dtostrf(sample.p.dt, width, decimalPlaces, cbuf + offset);
 
     // Print Buffered Array to Serial
-    // cbufArray[CHAR_BUFFER_NUM_BYTES - 1] = '\0';
-    // cbufArray[CHAR_BUFFER_NUM_BYTES] = MSG_TERMINATOR;
     cbufArray[offset + width] = MSG_TERMINATOR;
-    cbufArray[offset + width + 1] = '\0';
+    // cbufArray[offset + width + 1] = '\0';
     Serial.write(cbufArray, CHAR_BUFFER_NUM_BYTES - 1);
 }
 
-void captureDisplacement()
+//  Variable-Size Conversion to ASCII Strings
+void transmitDisplacementString(const labeled_sample_t sample)
 {
-    sensor.triggerSampleCapture();
-    buf.push(sensor.readDisplacement(units));
+    // Precision
+    const unsigned char decimalPlaces = 3;
+
+    // Convert to String class
+    const String dx = String(sample.p.dx, decimalPlaces);
+    const String dy = String(sample.p.dy, decimalPlaces);
+    const String dt = String(sample.p.dt, decimalPlaces);
+
+    // Print ASCII Strings
+    Serial.print(sample.id + ID_DATA_DELIM + dx + DATA_DELIM + dy + DATA_DELIM + dt + MSG_TERMINATOR);
 }
