@@ -24,6 +24,10 @@
 // Pin Settings
 #define CS_PIN_A 4
 #define CS_PIN_B 5
+#define SYNC_OUT_PIN 3
+#define SYNC_EVERY_N_PIN 6
+#define SYNC_PULSE_WIDTH_MICROS 10
+#define SYNC_PULSE_STATE HIGH
 
 // Timing Settings (shooting for 480 fps minimum, sync with camera is nominal at this juncture)
 #define CAMERA_FPS 40
@@ -58,6 +62,7 @@ typedef struct
 const unit_specification_t units = {Unit::Distance::MICROMETER, Unit::Time::MILLISECOND};
 const int32_t DISPLACEMENT_FPS = (CAMERA_FPS * SAMPLES_PER_CAMERA_FRAME);
 const uint32_t usLoop = 1e6 / DISPLACEMENT_FPS;
+volatile int syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
 
 // Initialize microsecond counter and sample buffer
 elapsedMicros usCnt;
@@ -89,10 +94,29 @@ void setup()
     sensor.right.begin();
     delay(30);
 
+    // Set Sync Out Pin Modes
+    fastDigitalWrite(SYNC_OUT_PIN, !SYNC_PULSE_STATE);
+    fastDigitalWrite(SYNC_EVERY_N_PIN, !SYNC_PULSE_STATE);
+    fastPinMode(SYNC_OUT_PIN, OUTPUT);
+    fastPinMode(SYNC_EVERY_N_PIN, OUTPUT);
+
     // Start Acquisition
     usCnt = 0;
     sensor.left.triggerAcquisitionStart();
     sensor.right.triggerAcquisitionStart();
+
+    // Send Sync-Every-N Pulse (at start of first and every N subsequent frames)
+    fastDigitalWrite(SYNC_OUT_PIN, SYNC_PULSE_STATE);
+    delayMicroseconds(SYNC_PULSE_WIDTH_MICROS);
+    syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
+    fastDigitalWrite(SYNC_OUT_PIN, !SYNC_PULSE_STATE);
+
+    // print units
+    const String dunit = getAbbreviation(units.distance);
+    const String tunit = getAbbreviation(units.time);
+    Serial.println("\n\n\n");
+    Serial.println("label\t" + dunit + "\t\t" + dunit + "\t\t" + tunit + "\t" +
+                   "label\t" + dunit + "\t\t" + dunit + "\t\t" + tunit);
 };
 
 // =============================================================================
@@ -100,14 +124,27 @@ void setup()
 // =============================================================================
 void loop()
 {
+    static bool needSyncOutReset = true;
     while (usCnt < usLoop)
     {
-        sendAnyUpdate();
+        if (needSyncOutReset && (usCnt > SYNC_PULSE_WIDTH_MICROS))
+        {
+            fastDigitalWrite(SYNC_OUT_PIN, !SYNC_PULSE_STATE);
+            fastDigitalWrite(SYNC_EVERY_N_PIN, !SYNC_PULSE_STATE);
+            needSyncOutReset = false;
+        }
     }
-    //todo fastDigitalWrite(syncPin, HIGH);
+    fastDigitalWrite(SYNC_OUT_PIN, SYNC_PULSE_STATE);
     captureDisplacement();
     usCnt -= usLoop; // usCnt = totalLag?
-    //todo fastDigitalWrite(syncPin, LOW);
+    sendAnyUpdate();
+
+    if (--syncEveryNCount <= 0)
+    {
+        fastDigitalWrite(SYNC_EVERY_N_PIN, SYNC_PULSE_STATE);
+        syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
+    }
+    needSyncOutReset = true;
 }
 
 static inline void sendAnyUpdate()

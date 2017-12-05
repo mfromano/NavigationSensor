@@ -33,13 +33,17 @@ class ADNS
 	bool begin(const uint16_t resolutionCPI = ADNS_DEFAULT_SENSOR_RESOLUTION,
 			   const uint16_t minSampleRateHz = ADNS_DEFAULT_SENSOR_MINSAMPLERATE);
 
-	String getName(); // { return String(ADNS_NAME).concat(String("_pin")).concat(String(_chipSelectPin, DEC)); };
+	String getName();
+	// String getId() { return chipSelectPin; }; //todo
+	// adns_sample_t getValues(){}; //todo
+	// getUnits() //todo
+	// getResolution()
+	// getConfig() //todo
 
 	// Trigger Start, Capture, & Readout
 	void triggerAcquisitionStart();
 	void triggerSampleCapture();
 	void triggerAcquisitionStop();
-	//todo -> inline static void these for responsiveness from ISRs
 
 	// Convert & Return Captured Data
 	displacement_t readDisplacement(const unit_specification_t = DEFAULT_UNIT) const;

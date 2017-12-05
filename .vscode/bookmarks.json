@@ -4,5 +4,19 @@
 	"onDidAddBookmarkEmitter": {},
 	"onDidRemoveBookmarkEmitter": {},
 	"onDidUpdateBookmarkEmitter": {},
-	"bookmarks": []
+	"bookmarks": [
+		{
+			"fsPath": "$ROOTPATH$\\src\\ADNS9800\\adns.cpp",
+			"bookmarks": [
+				377,
+				388
+			]
+		},
+		{
+			"fsPath": "$ROOTPATH$\\src\\main.cpp",
+			"bookmarks": [
+				100
+			]
+		}
+	]
 }

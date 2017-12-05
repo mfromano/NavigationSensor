@@ -49,29 +49,10 @@ void ADNS::triggerAcquisitionStart()
 	_microsSinceStart = 0;
 	_microsSinceCapture = _microsSinceStart;
 
-	// Reset Current Position
-	// _position.x = 0;
-	// _position.y = 0;
-	// _position.t = 0;
-
-	// Reset Current Raw-Readout & Sample Buffers with Fresh Data
-	// static adns_readout_t freshReadout;
-	// static adns_sample_t freshSample;
-	// _position.t = 0;
-	// _readout = freshReadout;
-	// _sample = freshSample;
-
+	// Zero all Position and Readout Data
 	memset(&_position, 0, sizeof(_position));
 	memset(&_readout, 0, sizeof(_readout));
 	memset(&_sample, 0, sizeof(_sample));
-
-	// volatile void *ptr;
-	// ptr = &_position;
-	// memset(ptr, 0, sizeof(*ptr));
-	// ptr = &_readout;
-	// memset(ptr, 0, sizeof(*ptr));
-	// ptr = &_sample;
-	// memset(ptr, 0, sizeof(*ptr));
 
 	// Release SPI Bus and Interrupts Hold
 	deselect();
@@ -406,6 +387,7 @@ void ADNS::deselect()
 	{
 		// delayMicroseconds(1); // tSCLK-NCS
 		fastDigitalWrite(_chipSelectPin, HIGH);
+		// alternative is to make member variable -->  DigitalPin pin(_chipSelectPin); pin.high();
 		SPI.endTransaction();
 		_selectedFlag = 0;
 	}
