@@ -43,7 +43,7 @@ void ADNS::triggerAcquisitionStart()
 	select();
 	// // SPI.transfer((uint8_t)RegisterAddress::Motion | 0x80);
 	// // SPI.transfer(0x00);
-	SPI.transfer((uint8_t)RegisterAddress::Motion & 0x7f);
+	SPI.transfer((uint8_t)RegisterAddress::Motion_Burst & 0x7f);
 
 	// Set Start-Time Microsecond Offset
 	_microsSinceStart = 0;
