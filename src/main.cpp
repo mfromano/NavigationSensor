@@ -26,7 +26,7 @@
 #define CS_PIN_B 5
 #define SYNC_OUT_PIN 3
 #define SYNC_EVERY_N_PIN 6
-#define SYNC_PULSE_WIDTH_MICROS 10
+#define SYNC_PULSE_WIDTH_MICROS 500
 #define SYNC_PULSE_STATE HIGH
 
 // Timing Settings (shooting for 480 fps minimum, sync with camera is nominal at this juncture)
@@ -37,9 +37,17 @@
 #define CHAR_BUFFER_NUM_BYTES 44
 
 // Delimiters and Terminators
-#define ID_DATA_DELIM ':'
-#define DATA_DELIM ','
-#define MSG_TERMINATOR '\t'
+#define FIXED_SIZE_ID_DELIM ':'
+#define FIXED_SIZE_DATA_DELIM ','
+#define FIXED_SIZE_MSG_TERMINATOR '\t'
+
+enum class TransmitFormat
+{
+    FIXED,
+    DELIMITED,
+    JSON,
+    BINARY //todo binary stream
+};
 
 // Define Left-Right Sensor Pair Structure
 typedef struct
@@ -59,21 +67,48 @@ typedef struct
 } labeled_sample_t;
 
 // Specify some Constants for Timing and Unit Conversion/Reporting
-const unit_specification_t units = {Unit::Distance::MICROMETER, Unit::Time::MILLISECOND};
 const int32_t DISPLACEMENT_FPS = (CAMERA_FPS * SAMPLES_PER_CAMERA_FRAME);
 const uint32_t usLoop = 1e6 / DISPLACEMENT_FPS;
 volatile int syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
+
+// Delimiter & Precision for Conversion to String
+const TransmitFormat format = TransmitFormat::DELIMITED;
+const unit_specification_t units = {
+    Unit::Distance::MICROMETER,
+    Unit::Time::MICROSECOND};
+const char delimiter = '\t';
+const unsigned char decimalPlaces = 3;
+const bool waitBeforeStart = true;
+
+// Sensor and Field Names
+typedef String sensor_name_t;
+typedef String field_name_t;
+const sensor_name_t sensorNames[] = {"left", "right"};
+const field_name_t fieldNames[] = {"dx", "dy", "dt"};
+const String flatFieldNames[] =
+    {
+        sensorNames[0] + '_' + fieldNames[0],
+        sensorNames[0] + '_' + fieldNames[1],
+        sensorNames[0] + '_' + fieldNames[2],
+        sensorNames[1] + '_' + fieldNames[0],
+        sensorNames[1] + '_' + fieldNames[1],
+        sensorNames[1] + '_' + fieldNames[2]};
 
 // Initialize microsecond counter and sample buffer
 elapsedMicros usCnt;
 CircularBuffer<labeled_sample_t, 3> bufA;
 CircularBuffer<labeled_sample_t, 3> bufB;
+uint32_t sensorSampleCnt = 0;
+uint32_t cameraFrameCnt = 0;
+uint32_t sampleCntTarget = 0;
 
 // Declare Test Functions
+static inline void sendFormat();
 static inline void sendAnyUpdate();
+static inline void checkCmd();
 static inline void captureDisplacement();
-void transmitDisplacementString(const labeled_sample_t);
-void transmitDisplacementChar(const labeled_sample_t);
+void transmitDisplacementDelimitedString(const labeled_sample_t);
+void transmitDisplacementFixedSize(const labeled_sample_t);
 
 // =============================================================================
 //   INITIALIZATION
@@ -100,6 +135,11 @@ void setup()
     fastPinMode(SYNC_OUT_PIN, OUTPUT);
     fastPinMode(SYNC_EVERY_N_PIN, OUTPUT);
 
+    // Print units and Fieldnames (header)
+    sendFormat();
+
+    checkCmd();
+
     // Start Acquisition
     usCnt = 0;
     sensor.left.triggerAcquisitionStart();
@@ -107,16 +147,8 @@ void setup()
 
     // Send Sync-Every-N Pulse (at start of first and every N subsequent frames)
     fastDigitalWrite(SYNC_OUT_PIN, SYNC_PULSE_STATE);
-    delayMicroseconds(SYNC_PULSE_WIDTH_MICROS);
+    fastDigitalWrite(SYNC_EVERY_N_PIN, SYNC_PULSE_STATE);
     syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
-    fastDigitalWrite(SYNC_OUT_PIN, !SYNC_PULSE_STATE);
-
-    // print units
-    const String dunit = getAbbreviation(units.distance);
-    const String tunit = getAbbreviation(units.time);
-    Serial.println("\n\n\n");
-    Serial.println("label\t" + dunit + "\t\t" + dunit + "\t\t" + tunit + "\t" +
-                   "label\t" + dunit + "\t\t" + dunit + "\t\t" + tunit);
 };
 
 // =============================================================================
@@ -124,6 +156,9 @@ void setup()
 // =============================================================================
 void loop()
 {
+    sendAnyUpdate();
+
+    // Reset Trigger Outputs
     static bool needSyncOutReset = true;
     while (usCnt < usLoop)
     {
@@ -134,27 +169,64 @@ void loop()
             needSyncOutReset = false;
         }
     }
-    fastDigitalWrite(SYNC_OUT_PIN, SYNC_PULSE_STATE);
-    captureDisplacement();
-    usCnt -= usLoop; // usCnt = totalLag?
-    sendAnyUpdate();
 
+    checkCmd();
+
+    // Set Downsampled ("Camera") Trigger Output Every N Samples
     if (--syncEveryNCount <= 0)
     {
         fastDigitalWrite(SYNC_EVERY_N_PIN, SYNC_PULSE_STATE);
         syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
     }
+
+    // Initiate Sample Capture
+    fastDigitalWrite(SYNC_OUT_PIN, SYNC_PULSE_STATE);
+    captureDisplacement();
+    usCnt -= usLoop; // usCnt = totalLag?
+
     needSyncOutReset = true;
 }
 
-static inline void sendAnyUpdate()
+static inline void sendFormat()
 {
-    // Print Velocity
-    while ((!bufA.isEmpty()) && (!(bufB.isEmpty())))
+    const String dunit = getAbbreviation(units.distance);
+    const String tunit = getAbbreviation(units.time);
+    if (format == TransmitFormat::FIXED)
     {
-        transmitDisplacementChar(bufA.shift());
-        transmitDisplacementChar(bufB.shift());
-        Serial.write('\r');
+        Serial.println("\n\n\n");
+        Serial.println("label\t" + dunit + "\t\t" + dunit + "\t\t" + tunit + "\t" +
+                       "label\t" + dunit + "\t\t" + dunit + "\t\t" + tunit);
+    }
+    else
+    {
+
+        Serial.print(
+            String(
+                flatFieldNames[0] + " [" + dunit + "]" + delimiter +
+                flatFieldNames[1] + " [" + dunit + "]" + delimiter +
+                flatFieldNames[2] + " [" + tunit + "]" + delimiter +
+                flatFieldNames[3] + " [" + dunit + "]" + delimiter +
+                flatFieldNames[4] + " [" + dunit + "]" + delimiter +
+                flatFieldNames[5] + " [" + tunit + "]" + delimiter +
+                '\n'));
+    }
+}
+
+static inline void checkCmd()
+{
+    // Read Serial to see if request for more frames has been sent
+    if (waitBeforeStart)
+    {
+        if (Serial.available() || (sampleCntTarget < 0))
+        {
+            while (!Serial.available())
+                delayMicroseconds(100);
+
+            uint32_t moreFramesCnt = Serial.parseInt();
+            sampleCntTarget += (SAMPLES_PER_CAMERA_FRAME * moreFramesCnt);
+            //todo pause
+        }
+        sampleCntTarget--;
     }
 }
 
@@ -168,11 +240,47 @@ static inline void captureDisplacement()
     bufB.push(sampleB);
 }
 
-// Fixed-Size Buffer Conversion to ASCII char array
-void transmitDisplacementChar(const labeled_sample_t sample)
+static inline void sendAnyUpdate()
 {
-    // Precision and Max-Width of String Representation of Floats
-    static const unsigned char decimalPlaces = 3;
+    static bool isFirstCall = true;
+
+    // Print Velocity
+    while ((!bufA.isEmpty()) && (!(bufB.isEmpty())))
+    {
+        if (format == TransmitFormat::FIXED)
+        {
+            transmitDisplacementFixedSize(bufA.shift());
+            transmitDisplacementFixedSize(bufB.shift());
+            Serial.write('\r');
+        }
+        else
+        {
+            transmitDisplacementDelimitedString(bufA.shift());
+            transmitDisplacementDelimitedString(bufB.shift());
+            Serial.print('\n');
+        }
+    }
+    isFirstCall = false;
+}
+
+//  Variable-Size Conversion to ASCII Strings
+void transmitDisplacementDelimitedString(const labeled_sample_t sample)
+{
+    // Convert to String class
+    const String dx = String(sample.p.dx, decimalPlaces);
+    const String dy = String(sample.p.dy, decimalPlaces);
+    const String dt = String(sample.p.dt, decimalPlaces);
+
+    // Print ASCII Strings
+    Serial.print(
+        dx + delimiter +
+        dy + delimiter +
+        dt + delimiter);
+}
+
+// Fixed-Size Buffer Conversion to ASCII char array
+void transmitDisplacementFixedSize(const labeled_sample_t sample)
+{
     static const signed char width = ((CHAR_BUFFER_NUM_BYTES - 2) / 3) - 2;
     static const size_t increment = width + 2;
 
@@ -185,35 +293,20 @@ void transmitDisplacementChar(const labeled_sample_t sample)
 
     // Set first Char with ID
     cbufArray[0] = sample.id;
-    cbufArray[1] = ID_DATA_DELIM;
+    cbufArray[1] = FIXED_SIZE_ID_DELIM;
 
     // Jump by Increment and Fill with Limited Width Float->ASCII
     size_t offset = 2;
     dtostrf(sample.p.dx, width, decimalPlaces, cbuf + offset);
-    cbufArray[offset + width] = DATA_DELIM;
+    cbufArray[offset + width] = FIXED_SIZE_DATA_DELIM;
     offset += increment;
     dtostrf(sample.p.dy, width, decimalPlaces, cbuf + offset);
-    cbufArray[offset + width] = DATA_DELIM;
+    cbufArray[offset + width] = FIXED_SIZE_DATA_DELIM;
     offset += increment;
     dtostrf(sample.p.dt, width, decimalPlaces, cbuf + offset);
 
     // Print Buffered Array to Serial
-    cbufArray[offset + width] = MSG_TERMINATOR;
+    cbufArray[offset + width] = FIXED_SIZE_MSG_TERMINATOR;
     // cbufArray[offset + width + 1] = '\0';
     Serial.write(cbufArray, CHAR_BUFFER_NUM_BYTES - 1);
-}
-
-//  Variable-Size Conversion to ASCII Strings
-void transmitDisplacementString(const labeled_sample_t sample)
-{
-    // Precision
-    const unsigned char decimalPlaces = 3;
-
-    // Convert to String class
-    const String dx = String(sample.p.dx, decimalPlaces);
-    const String dy = String(sample.p.dy, decimalPlaces);
-    const String dt = String(sample.p.dt, decimalPlaces);
-
-    // Print ASCII Strings
-    Serial.print(sample.id + ID_DATA_DELIM + dx + DATA_DELIM + dy + DATA_DELIM + dt + MSG_TERMINATOR);
 }
