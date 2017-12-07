@@ -72,13 +72,13 @@ const uint32_t usLoop = 1e6 / DISPLACEMENT_FPS;
 volatile int syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
 
 // Delimiter & Precision for Conversion to String
-const TransmitFormat format = TransmitFormat::DELIMITED;
+const TransmitFormat format = TransmitFormat::FIXED;
 const unit_specification_t units = {
     Unit::Distance::MICROMETER,
     Unit::Time::MICROSECOND};
 const char delimiter = '\t';
 const unsigned char decimalPlaces = 3;
-const bool waitBeforeStart = true;
+const bool waitBeforeStart = false;
 
 // Sensor and Field Names
 typedef String sensor_name_t;
@@ -107,6 +107,7 @@ static inline void sendFormat();
 static inline void sendAnyUpdate();
 static inline void checkCmd();
 static inline void captureDisplacement();
+void transmitDisplacementBinary(const labeled_sample_t);
 void transmitDisplacementDelimitedString(const labeled_sample_t);
 void transmitDisplacementFixedSize(const labeled_sample_t);
 
@@ -242,25 +243,48 @@ static inline void captureDisplacement()
 
 static inline void sendAnyUpdate()
 {
-    static bool isFirstCall = true;
-
     // Print Velocity
     while ((!bufA.isEmpty()) && (!(bufB.isEmpty())))
     {
-        if (format == TransmitFormat::FIXED)
+        switch (format)
         {
+        case (TransmitFormat::FIXED):
             transmitDisplacementFixedSize(bufA.shift());
             transmitDisplacementFixedSize(bufB.shift());
             Serial.write('\r');
-        }
-        else
-        {
+            break;
+        case (TransmitFormat::DELIMITED):
             transmitDisplacementDelimitedString(bufA.shift());
             transmitDisplacementDelimitedString(bufB.shift());
             Serial.print('\n');
+            break;
+        case (TransmitFormat::BINARY):
+            transmitDisplacementBinary(bufA.shift());
+            transmitDisplacementBinary(bufB.shift());
+            break;
         }
     }
-    isFirstCall = false;
+}
+
+void transmitDisplacementBinary(const labeled_sample_t sample)
+{
+    //todo not working -> serialize with standard library
+    // cast floats to bytes todo: make architecture invariant
+    const size_t numBytes = 12;
+    char buf[12];
+    typedef union {
+        float real;
+        uint32_t base;
+    } f2u;
+    const f2u dxyt[3] = {sample.p.dx, sample.p.dy, sample.p.dt};
+    for (int f = 0; f < 3; f++)
+    {
+        for (int b = 0; b < 4; b++)
+        {
+            *(buf + (f * b)) = ((dxyt[3 - f].base) >> (8 * b)) & 0xFF;
+        }
+    }
+    Serial.write(buf, numBytes);
 }
 
 //  Variable-Size Conversion to ASCII Strings
