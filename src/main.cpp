@@ -262,6 +262,11 @@ static inline void sendAnyUpdate()
             transmitDisplacementBinary(bufA.shift());
             transmitDisplacementBinary(bufB.shift());
             break;
+        case (TransmitFormat::JSON):
+            //todo
+            break;
+        default:
+            break;
         }
     }
 }
