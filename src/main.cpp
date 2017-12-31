@@ -72,7 +72,7 @@ const uint32_t usLoop = 1e6 / DISPLACEMENT_FPS;
 volatile int syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
 
 // Delimiter & Precision for Conversion to String
-const TransmitFormat format = TransmitFormat::FIXED;
+const TransmitFormat format = TransmitFormat::DELIMITED;
 const unit_specification_t units = {
     Unit::Distance::MICROMETER,
     Unit::Time::MICROSECOND};
