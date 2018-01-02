@@ -1,47 +1,59 @@
 // Protocol-Buffers file defining format of sensor measurements for sending of serial line and saving in file
 
 syntax = "proto2";
+package = navsensor;
 
+// todo: implement options for performance
+// label type ident = num;
+// repeated type ident = num [packed = true];
+// repeated type ident = num [max_count = 1];
+// label bytes ident = num    [max_size = 1]
 
 // Sensor ID Class
 message SensorID{
     optional int32 num = 1;
-    optional string name = 2 [(nanopb).max_size = 40];
+    optional string name = 2 [max_size = 40];
 }
 
 // Time and Duration types matching ROS classes
 message Time{
     optional uint32 sec = 1;
     optional uint32 nsec = 2;    
-}// todo union style support for various time types such as integer:fractional (OSC) messages
+}// todo union style support for various time types such as integer:fractional (OSC) messages or sfixed64
 
 message Duration{
     optional int32 sec = 1;
     optional int32 nsec = 2;    
 }
 
+// Reportable Outputs
 message Displacement{
     required float x = 1;
     required float y = 2;
     optional Duration t= 3; 
 }
 
+message Position{
+    required float x = 1;
+    required float y = 2;
+    optional Duration t= 3; 
+}
 
 message SensorStatus{
-    optional uint8 motion = 1;      // [mot|fault|LaserPowerValid|opmode1,opmode0|framepixfirst]
-    optional uint8 observation = 2; // 0xFF = running, 0x00 = no response
+    optional int32 motion = 1;      // [mot|fault|LaserPowerValid|opmode1,opmode0|framepixfirst]
+    optional int32 observation = 2; // 0xFF = running, 0x00 = no response
 } 
 
 message PixelStatistics{
-    optional uint8 min = 1;      // min pixel intensity : [0,127]
-    optional uint8 mean = 2;     // mean = sumH * 512/900  or sumH/1.76 : [0,223]
-    optional uint8 max = 3;      // max intensity : [0,127]
-    optional uint16 features = 4; // number of features (actual count = feature * 4) : [0,169]
+    optional int32 min = 1;      // min pixel intensity : [0,127]
+    optional int32 mean = 2;     // mean = sumH * 512/900  or sumH/1.76 : [0,223]
+    optional int32 max = 3;      // max intensity : [0,127]
+    optional int32 features = 4; // number of features (actual count = feature * 4) : [0,169]
 } 
 
 message PeriodMicros{
-    optional uint16 shutter = 1; // microseconds
-    optional uint16 frame = 2;   // microseconds
+    optional uint32 shutter = 1; // microseconds
+    optional uint32 frame = 2;   // microseconds
 } 
 
 message AdditionalInfo{
@@ -65,12 +77,36 @@ message DisplacementBundle{
     repeated Displacement displacement = 3 [(nanopb).max_count = 8];
 }
 
+message SampleBundle{
+    optional int32 count = 1;    
+    optional Time timestamp = 2;
+    repeated group Result = 1 {
+        required string url = 2;
+        optional string title = 3;
+        repeated string snippets = 4;
+    };
+}
+//todo SensorEvent
+
+// compile using --descriptor_set_out
+// message SelfDescribingMessage {
+//     required FileDescriptorSet proto_files = 1;
+    
+//     // Name of the message type.  Must be defined by one of the files in
+//     // proto_files.
+//     required string type_name = 2;
+    
+//     // The message data.
+//     required bytes message_data = 3;
+// }
+
 // OPTIONS
 // ----- in file -> navsensor.options
-//  DataPacket.name         max-size:40
-//  DataPacket.data         max_count:16
-//  DataPacket.timestamp    fixed_length:true
+// DataPacket.name         max-size:40
+// DataPacket.data         max_count:16
+// DataPacket.timestamp    fixed_length:true
 //
 // ----- inline
-//  required string name = 1 [(nanopb).max_size = 40];
-//  repeated int32 ids = 4   [(nanopb).max_count = 5];
+// required string name = 1 [(nanopb).max_size = 40];
+// repeated int32 ids = 4   [(nanopb).max_count = 5];
+// option java_package = "com.example.foo";
