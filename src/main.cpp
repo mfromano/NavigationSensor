@@ -3,20 +3,13 @@
   main.cpp
 
 */
-#include <Arduino.h>
 
 // Arduino Includes
+#include <Arduino.h>
 #include <SPI.h>
 #include <elapsedMillis.h>
 #include <CircularBuffer.h>
 #include <DigitalIO.h>
-// #include <IntervalTimer.h>
-// IntervalTimer timer;
-// timer.priority(0);
-// timer.begin(fcn,us);
-//
-// #include <usb_audio.h>
-// #include <AudioStream.h>
 
 // Include ADNS Library for ADNS-9800 Sensor
 #include "ADNS9800\ADNS.h"
