@@ -29,7 +29,7 @@ message DeviceInfo
     repeated EventInfo events       = 10; 
     repeated CommandInfo commands   = 11; 
     repeated SettingInfo settings   = 12; 
-    repeated SensorInfo sensors     = 13;     
+    repeated NodeInfo nodes     = 13;     
     repeated TriggerInfo triggers    = 14;
 }
 
@@ -49,13 +49,25 @@ message SettingInfo
     optional DataInfo value = 4 ; 
 }
 
-message SensorInfo
+message NodeInfo
 {
     optional sint32 id          = 1 ;  
     optional string name        = 2 ;  
     optional string address     = 3 ;  
     optional string description = 4 ;  
+    optional NodeType type = 5;
     repeated SettingInfo settings   = 12 ;
+    repeated EventInfo events = 13;
+}
+
+enum NodeType
+{
+    UNKNOWN = 0;
+    SENSOR = 1;
+    ACTUATOR = 2;
+    // GPIO = 3;
+    // PWM = 4;
+    VIRTUAL = 10;
 }
 
 message EventInfo
