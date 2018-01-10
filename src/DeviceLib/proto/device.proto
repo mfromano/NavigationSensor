@@ -1,0 +1,99 @@
+// Protocol-Buffers file defining format of sensor measurements for sending of
+// serial line and saving in file
+
+syntax  = "proto2";
+package = devicelib;
+import "sensor.proto"
+import "time.proto"
+
+message DeviceInfo
+{
+    optional sint32 id          = 1 ;  
+    optional string name        = 2 ;  
+    optional string address     = 3 ;  
+    optional string description = 4 ;  
+    repeated CommandInfo commands   = 11 ; 
+    repeated SettingInfo settings   = 12 ; 
+    repeated SensorInfo sensors     = 13 ;     
+    repeated EventInfo events       = 14 ; 
+}
+
+message CommandInfo
+{
+    required sint32 id                = 1 ; 
+    optional string name              = 2 ; 
+    optional string address           = 3 ; 
+    repeated ParameterInfo parameters = 4 ; 
+
+    message ParameterInfo{
+        required name = 1;
+        optional google.protobuf.Kind kind = 2;
+    }
+}
+
+message SettingInfo
+{
+    required sint32 id                = 1 ; 
+    optional string name              = 2 ; 
+    optional string address           = 3 ; 
+    repeated ParameterInfo parameters = 4 ; 
+
+    message ParameterInfo{
+        required name = 1;
+        optional google.protobuf.Kind kind = 2;
+    }
+}
+
+
+message EventInfo
+{
+    required sint32 id                = 1 ; 
+    optional string name              = 2 ; 
+    optional string address           = 3 ; 
+    optional EventType type           = 4 ; 
+    optional PayloadInfo payload     = 7 ; 
+}
+
+message PayloadInfo
+{
+    optional uint32 count = 1;
+    repeated DataInfo data = 2;
+}
+
+import "type.googleapis.com"
+google.protobuf.Field field_info
+
+
+
+message DataInfo
+{
+    optional google.protobuf.Kind kind = 1;
+
+    optional UnitInfo unit = 11;
+    optional NumericType min = 12;
+    optional NumericType max = 13;
+    optional NumericType resolution = 14;
+}
+
+
+
+message Event
+{
+    required sint32 id                = 1 ; 
+    optional string name              = 2 ; 
+    optional string address           = 3 ; 
+    optional EventType type           = 4 ; 
+    optional EventTimestamp timestamp = 5 ; 
+    optional uint32 sequence          = 6 ; 
+    optional EventPayload payload     = 7 ; 
+}
+
+enum EventType
+{
+    INFO         = 1 ; 
+    ECHO_COMMAND = 2 ; 
+    SETTING      = 3 ; 
+    STATUS       = 4 ; 
+    SENSOR_DATA  = 5 ; 
+    ACTION       = 6 ; 
+}
