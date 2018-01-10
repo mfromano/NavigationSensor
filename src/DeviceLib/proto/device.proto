@@ -9,6 +9,8 @@ import "time.proto";
 import "google/protobuf/descriptor.proto"; // descriptor?
 import "google/protobuf/any.proto";// any?
 
+//required bytes data = 1 [(nanopb).max_size = 40, (nanopb).fixed_length = true];
+
 message Record
 {
     optional DeviceInfo device = 1;
@@ -17,13 +19,13 @@ message Record
     repeated Event event_stream = 4;
     optional sint32 event_count = 5;
     optional Timestamp stop_time = 6;
-    optional string name = 7;
+    optional string name = 7[(nanopb).max_size=40];
 }
 
 message DeviceInfo
 {
-    optional sint32 id          = 1;  
-    optional string name        = 2;  
+    optional sint32 id          = 1 (nanopb_msgopt).msgid ;  
+    optional string name        = 2[(nanopb).max_size=40];  
     optional string address     = 3;  
     optional string description = 4;  
     repeated EventInfo events       = 10; 
@@ -35,24 +37,24 @@ message DeviceInfo
 
 message CommandInfo
 {
-    required sint32 id                = 1 ; 
-    optional string name              = 2 ; 
+    required sint32 id                = 1 (nanopb_msgopt).msgid ; 
+    optional string name              = 2 [(nanopb).max_size=40]; 
     optional string address           = 3 ; 
     repeated DataInfo arguments = 4 ; 
 }
 
 message SettingInfo
 {
-    required sint32 id                = 1 ; 
-    optional string name              = 2 ; 
+    required sint32 id                = 1 (nanopb_msgopt).msgid ; 
+    optional string name              = 2 [(nanopb).max_size=40]; 
     optional string address           = 3 ; 
     optional DataInfo value = 4 ; 
 }
 
 message NodeInfo
 {
-    optional sint32 id          = 1 ;  
-    optional string name        = 2 ;  
+    optional sint32 id          = 1 (nanopb_msgopt).msgid ;  
+    optional string name        = 2 [(nanopb).max_size=40];  
     optional string address     = 3 ;  
     optional string description = 4 ;  
     optional NodeType type = 5;
@@ -72,8 +74,8 @@ enum NodeType
 
 message EventInfo
 {
-    required sint32 id                = 1 ; 
-    optional string name              = 2 ; 
+    required sint32 id                = 1 (nanopb_msgopt).msgid ; 
+    optional string name              = 2 [(nanopb).max_size=40]; 
     optional string address           = 3 ; 
     optional EventType type           = 4 ; 
     optional PayloadInfo payload     = 7 ; 
@@ -87,8 +89,8 @@ message PayloadInfo
 
 message DataInfo
 {
-    optional sint32 id = 1;
-    optional string name = 2;
+    optional sint32 id = 1(nanopb_msgopt).msgid ;
+    optional string name = 2[(nanopb).max_size=40];
     optional google.protobuf.Kind kind = 3;
     optional bool is_numeric = 4;
     optional UnitInfo unit = 11;
@@ -103,20 +105,20 @@ message NumericType
         sint32 integer_num = 1;
         float float_num = 2;
         double double_num = 3;
-        string string_num = 4 [max_count = 10];
+        string string_num = 4 [(nanopb).max_size = 10];
     }
 }
 
 message UnitInfo
 {
-    required string abbreviation = 1 [max_count=4];
-    optional string name = 2;
+    required string abbreviation = 1 [(nanopb).max_size=4];
+    optional string name = 2[(nanopb).max_size=40];
     optional bool is_si = 3;
 }
 
 message Event
 {
-    required sint32 id                = 1 ; 
+    required sint32 id                = 1 (nanopb_msgopt).msgid ; 
     optional EventInfo info = 2;
     optional Timestamp timestamp = 5 ; 
     optional uint32 sequence          = 6 ; 
