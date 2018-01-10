@@ -3,19 +3,34 @@
 
 syntax  = "proto2";
 package = devicelib;
-import "sensor.proto"
-import "time.proto"
+
+import "sensor.proto";
+import "time.proto";
+import "google/protobuf/descriptor.proto"; // descriptor?
+import "google/protobuf/any.proto";// any?
+
+message Record
+{
+    optional DeviceInfo device = 1;
+    repeated map<sint32, EventInfo> event_map = 2;
+    optional Timestamp start_time = 3;
+    repeated Event event_stream = 4;
+    optional sint32 event_count = 5;
+    optional Timestamp stop_time = 6;
+    optional string name = 7;
+}
 
 message DeviceInfo
 {
-    optional sint32 id          = 1 ;  
-    optional string name        = 2 ;  
-    optional string address     = 3 ;  
-    optional string description = 4 ;  
-    repeated CommandInfo commands   = 11 ; 
-    repeated SettingInfo settings   = 12 ; 
-    repeated SensorInfo sensors     = 13 ;     
-    repeated EventInfo events       = 14 ; 
+    optional sint32 id          = 1;  
+    optional string name        = 2;  
+    optional string address     = 3;  
+    optional string description = 4;  
+    repeated EventInfo events       = 10; 
+    repeated CommandInfo commands   = 11; 
+    repeated SettingInfo settings   = 12; 
+    repeated SensorInfo sensors     = 13;     
+    repeated TriggerInfo triggers    = 14;
 }
 
 message CommandInfo
@@ -23,12 +38,7 @@ message CommandInfo
     required sint32 id                = 1 ; 
     optional string name              = 2 ; 
     optional string address           = 3 ; 
-    repeated ParameterInfo parameters = 4 ; 
-
-    message ParameterInfo{
-        required name = 1;
-        optional google.protobuf.Kind kind = 2;
-    }
+    repeated DataInfo arguments = 4 ; 
 }
 
 message SettingInfo
@@ -36,14 +46,17 @@ message SettingInfo
     required sint32 id                = 1 ; 
     optional string name              = 2 ; 
     optional string address           = 3 ; 
-    repeated ParameterInfo parameters = 4 ; 
-
-    message ParameterInfo{
-        required name = 1;
-        optional google.protobuf.Kind kind = 2;
-    }
+    optional DataInfo value = 4 ; 
 }
 
+message SensorInfo
+{
+    optional sint32 id          = 1 ;  
+    optional string name        = 2 ;  
+    optional string address     = 3 ;  
+    optional string description = 4 ;  
+    repeated SettingInfo settings   = 12 ;
+}
 
 message EventInfo
 {
@@ -60,32 +73,47 @@ message PayloadInfo
     repeated DataInfo data = 2;
 }
 
-import "type.googleapis.com"
-google.protobuf.Field field_info
-
-
-
 message DataInfo
 {
-    optional google.protobuf.Kind kind = 1;
-
+    optional sint32 id = 1;
+    optional string name = 2;
+    optional google.protobuf.Kind kind = 3;
+    optional bool is_numeric = 4;
     optional UnitInfo unit = 11;
     optional NumericType min = 12;
     optional NumericType max = 13;
     optional NumericType resolution = 14;
 }
 
+message NumericType
+{
+    oneof num {
+        sint32 integer_num = 1;
+        float float_num = 2;
+        double double_num = 3;
+        string string_num = 4 [max_count = 10];
+    }
+}
 
+message UnitInfo
+{
+    required string abbreviation = 1 [max_count=4];
+    optional string name = 2;
+    optional bool is_si = 3;
+}
 
 message Event
 {
     required sint32 id                = 1 ; 
-    optional string name              = 2 ; 
-    optional string address           = 3 ; 
-    optional EventType type           = 4 ; 
-    optional EventTimestamp timestamp = 5 ; 
+    optional EventInfo info = 2;
+    optional Timestamp timestamp = 5 ; 
     optional uint32 sequence          = 6 ; 
-    optional EventPayload payload     = 7 ; 
+    optional Payload payload     = 7 ; 
+}
+
+message Payload 
+{
+    
 }
 
 enum EventType
@@ -97,3 +125,7 @@ enum EventType
     SENSOR_DATA  = 5 ; 
     ACTION       = 6 ; 
 }
+
+// import "type.googleapis.com"
+
+// google.protobuf.Field field_info
