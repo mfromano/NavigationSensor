@@ -11,6 +11,19 @@
 #include <SPI.h>
 #include <elapsedMillis.h>
 
+#if defined(__MK20DX128__) || defined(__MK20DX256__)
+#include <usb_serial.h> // Teensy 3.0 and 3.1
+#define SERIAL_CLASS usb_serial_class
+#elif defined(_SAM3XA_)
+#include <UARTClass.h> // Arduino Due
+#define SERIAL_CLASS UARTClass
+#elif defined(USE_USBCON)
+// Arduino Leonardo USB Serial Port
+#define SERIAL_CLASS Serial_
+#else
+#include <HardwareSerial.h> // Arduino AVR
+#define SERIAL_CLASS HardwareSerial
+#endif
 
 // Include ADNS Library for ADNS-9800 Sensor
 #include "ADNS9800\ADNS.h"
@@ -36,7 +49,8 @@
 #define FIXED_SIZE_DATA_DELIM ','
 #define FIXED_SIZE_MSG_TERMINATOR '\t'
 
-enum class TransmitFormat {
+enum class TransmitFormat
+{
   FIXED,
   DELIMITED,
   JSON,
@@ -44,7 +58,8 @@ enum class TransmitFormat {
 };
 
 // Define Left-Right Sensor Pair Structure
-typedef struct {
+typedef struct
+{
   ADNS &left;
   ADNS &right;
 } sensor_pair_t;
@@ -53,7 +68,8 @@ typedef struct {
 ADNS adnsA(CS_PIN_A);
 ADNS adnsB(CS_PIN_B);
 sensor_pair_t sensor = {adnsA, adnsB};
-typedef struct {
+typedef struct
+{
   char id = 'L';
   displacement_t p;
 } labeled_sample_t;
@@ -101,10 +117,12 @@ void transmitDisplacementFixedSize(const labeled_sample_t);
 // =============================================================================
 //   INITIALIZATION
 // =============================================================================
-void setup() {
+void setup()
+{
   // Begin Serial
   Serial.begin(115200);
-  while (!Serial) {
+  while (!Serial)
+  {
     ; // may only be needed for native USB port
   }
   delay(10);
@@ -140,13 +158,16 @@ void setup() {
 // =============================================================================
 //   LOOP
 // =============================================================================
-void loop() {
+void loop()
+{
   sendAnyUpdate();
 
   // Reset Trigger Outputs
   static bool needSyncOutReset = true;
-  while (usCnt < usLoop) {
-    if (needSyncOutReset && (usCnt > SYNC_PULSE_WIDTH_MICROS)) {
+  while (usCnt < usLoop)
+  {
+    if (needSyncOutReset && (usCnt > SYNC_PULSE_WIDTH_MICROS))
+    {
       fastDigitalWrite(SYNC_OUT_PIN, !SYNC_PULSE_STATE);
       fastDigitalWrite(SYNC_EVERY_N_PIN, !SYNC_PULSE_STATE);
       needSyncOutReset = false;
@@ -156,7 +177,8 @@ void loop() {
   checkCmd();
 
   // Set Downsampled ("Camera") Trigger Output Every N Samples
-  if (--syncEveryNCount <= 0) {
+  if (--syncEveryNCount <= 0)
+  {
     fastDigitalWrite(SYNC_EVERY_N_PIN, SYNC_PULSE_STATE);
     syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
   }
@@ -169,14 +191,18 @@ void loop() {
   needSyncOutReset = true;
 }
 
-static inline void sendFormat() {
+static inline void sendFormat()
+{
   const String dunit = getAbbreviation(units.distance);
   const String tunit = getAbbreviation(units.time);
-  if (format == TransmitFormat::FIXED) {
+  if (format == TransmitFormat::FIXED)
+  {
     Serial.println("\n\n\n");
     Serial.println("label\t" + dunit + "\t\t" + dunit + "\t\t" + tunit + "\t" +
                    "label\t" + dunit + "\t\t" + dunit + "\t\t" + tunit);
-  } else {
+  }
+  else
+  {
 
     Serial.print(String(
         flatFieldNames[0] + " [" + dunit + "]" + delimiter + flatFieldNames[1] +
@@ -187,10 +213,13 @@ static inline void sendFormat() {
   }
 }
 
-static inline void checkCmd() {
+static inline void checkCmd()
+{
   // Read Serial to see if request for more frames has been sent
-  if (waitBeforeStart) {
-    if (Serial.available() || (sampleCntTarget < 0)) {
+  if (waitBeforeStart)
+  {
+    if (Serial.available() || (sampleCntTarget < 0))
+    {
       while (!Serial.available())
         delayMicroseconds(100);
 
@@ -202,7 +231,8 @@ static inline void checkCmd() {
   }
 }
 
-static inline void captureDisplacement() {
+static inline void captureDisplacement()
+{
   sensor.left.triggerSampleCapture();
   sensor.right.triggerSampleCapture();
   const labeled_sample_t sampleA = {'L', sensor.left.readDisplacement(units)};
@@ -211,10 +241,13 @@ static inline void captureDisplacement() {
   bufB.push(sampleB);
 }
 
-static inline void sendAnyUpdate() {
+static inline void sendAnyUpdate()
+{
   // Print Velocity
-  while ((!bufA.isEmpty()) && (!(bufB.isEmpty()))) {
-    switch (format) {
+  while ((!bufA.isEmpty()) && (!(bufB.isEmpty())))
+  {
+    switch (format)
+    {
     case (TransmitFormat::FIXED):
       transmitDisplacementFixedSize(bufA.shift());
       transmitDisplacementFixedSize(bufB.shift());
@@ -238,7 +271,8 @@ static inline void sendAnyUpdate() {
   }
 }
 
-void transmitDisplacementBinary(const labeled_sample_t sample) {
+void transmitDisplacementBinary(const labeled_sample_t sample)
+{
   // todo not working -> serialize with standard library
   // cast floats to bytes todo: make architecture invariant
   const size_t numBytes = 12;
@@ -248,8 +282,10 @@ void transmitDisplacementBinary(const labeled_sample_t sample) {
     uint32_t base;
   } f2u;
   const f2u dxyt[3] = {sample.p.dx, sample.p.dy, sample.p.dt};
-  for (int f = 0; f < 3; f++) {
-    for (int b = 0; b < 4; b++) {
+  for (int f = 0; f < 3; f++)
+  {
+    for (int b = 0; b < 4; b++)
+    {
       *(buf + (f * b)) = ((dxyt[3 - f].base) >> (8 * b)) & 0xFF;
     }
   }
@@ -257,7 +293,8 @@ void transmitDisplacementBinary(const labeled_sample_t sample) {
 }
 
 //  Variable-Size Conversion to ASCII Strings
-void transmitDisplacementDelimitedString(const labeled_sample_t sample) {
+void transmitDisplacementDelimitedString(const labeled_sample_t sample)
+{
   // Convert to String class
   const String dx = String(sample.p.dx, decimalPlaces);
   const String dy = String(sample.p.dy, decimalPlaces);
@@ -268,7 +305,8 @@ void transmitDisplacementDelimitedString(const labeled_sample_t sample) {
 }
 
 // Fixed-Size Buffer Conversion to ASCII char array
-void transmitDisplacementFixedSize(const labeled_sample_t sample) {
+void transmitDisplacementFixedSize(const labeled_sample_t sample)
+{
   static const signed char width = ((CHAR_BUFFER_NUM_BYTES - 2) / 3) - 2;
   static const size_t increment = width + 2;
 
