@@ -5,6 +5,7 @@
 
 
 *.name  max_size:128
+*.address max_size:128
 UnitInfo.abbreviation max_size:4
 PayloadInfo.data max_count:16
 Payload.data max_count:16
