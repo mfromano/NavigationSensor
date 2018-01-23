@@ -95,10 +95,13 @@ message Data{
 
 
 enum DataType{
-    NUMERIC = 0;
+    NUMBER = 0;
     STRING = 1;
     BYTES = 2;
     BOOLEAN = 3;
+    INTEGER = 4;
+    ARRAY = 5;
+    OBJECT = 6;
 }
 
 // message Timestamp{
