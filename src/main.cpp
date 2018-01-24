@@ -20,7 +20,7 @@
 #elif defined(USE_USBCON)
 // Arduino Leonardo USB Serial Port
 #define SERIAL_CLASS Serial_
-#else
+#else 
 #include <HardwareSerial.h> // Arduino AVR
 #define SERIAL_CLASS HardwareSerial
 #endif
@@ -75,24 +75,24 @@ typedef struct
 } labeled_sample_t;
 
 // Specify some Constants for Timing and Unit Conversion/Reporting
-const int32_t DISPLACEMENT_FPS = (CAMERA_FPS * SAMPLES_PER_CAMERA_FRAME);
-const uint32_t usLoop = 1e6 / DISPLACEMENT_FPS;
-volatile int syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
+const    int32_t DISPLACEMENT_FPS = (CAMERA_FPS * SAMPLES_PER_CAMERA_FRAME);
+const    uint32_t usLoop          = 1e6 / DISPLACEMENT_FPS;
+volatile int syncEveryNCount      = SAMPLES_PER_CAMERA_FRAME;
 
 // Delimiter & Precision for Conversion to String
-const TransmitFormat format = TransmitFormat::DELIMITED;
+const TransmitFormat format      = TransmitFormat::DELIMITED;
 const unit_specification_t units = {Unit::Distance::MICROMETER,
                                     Unit::Time::MICROSECOND};
-const char delimiter = '\t';
+const char delimiter              = '\t';
 const unsigned char decimalPlaces = 3;
-const bool waitBeforeStart = false;
+const bool waitBeforeStart        = false;
 
 // Sensor and Field Names
 typedef String sensor_name_t;
 typedef String field_name_t;
 const sensor_name_t sensorNames[] = {"left", "right"};
-const field_name_t fieldNames[] = {"dx", "dy", "dt"};
-const String flatFieldNames[] = {
+const field_name_t fieldNames[]   = {"dx", "dy", "dt"};
+const String flatFieldNames[]     = {
     sensorNames[0] + '_' + fieldNames[0], sensorNames[0] + '_' + fieldNames[1],
     sensorNames[0] + '_' + fieldNames[2], sensorNames[1] + '_' + fieldNames[0],
     sensorNames[1] + '_' + fieldNames[1], sensorNames[1] + '_' + fieldNames[2]};
@@ -102,7 +102,7 @@ elapsedMicros usCnt;
 CircularBuffer<labeled_sample_t, 3> bufA;
 CircularBuffer<labeled_sample_t, 3> bufB;
 uint32_t sensorSampleCnt = 0;
-uint32_t cameraFrameCnt = 0;
+uint32_t cameraFrameCnt  = 0;
 uint32_t sampleCntTarget = 0;
 
 // Declare Test Functions
@@ -186,7 +186,7 @@ void loop()
   // Initiate Sample Capture
   fastDigitalWrite(SYNC_OUT_PIN, SYNC_PULSE_STATE);
   captureDisplacement();
-  usCnt -= usLoop; // usCnt = totalLag?
+  usCnt -= usLoop;   // usCnt = totalLag?
 
   needSyncOutReset = true;
 }
@@ -223,8 +223,8 @@ static inline void checkCmd()
       while (!Serial.available())
         delayMicroseconds(100);
 
-      uint32_t moreFramesCnt = Serial.parseInt();
-      sampleCntTarget += (SAMPLES_PER_CAMERA_FRAME * moreFramesCnt);
+      uint32_t moreFramesCnt    = Serial.parseInt();
+               sampleCntTarget += (SAMPLES_PER_CAMERA_FRAME * moreFramesCnt);
       // todo pause
     }
     sampleCntTarget--;
@@ -248,24 +248,24 @@ static inline void sendAnyUpdate()
   {
     switch (format)
     {
-    case (TransmitFormat::FIXED):
+    case (TransmitFormat::FIXED): 
       transmitDisplacementFixedSize(bufA.shift());
       transmitDisplacementFixedSize(bufB.shift());
       Serial.write('\r');
       break;
-    case (TransmitFormat::DELIMITED):
+    case (TransmitFormat::DELIMITED): 
       transmitDisplacementDelimitedString(bufA.shift());
       transmitDisplacementDelimitedString(bufB.shift());
       Serial.print('\n');
       break;
-    case (TransmitFormat::BINARY):
+    case (TransmitFormat::BINARY): 
       transmitDisplacementBinary(bufA.shift());
       transmitDisplacementBinary(bufB.shift());
       break;
-    case (TransmitFormat::JSON):
+    case (TransmitFormat::JSON): 
       // todo
       break;
-    default:
+    default: 
       break;
     }
   }
@@ -308,7 +308,7 @@ void transmitDisplacementDelimitedString(const labeled_sample_t sample)
 void transmitDisplacementFixedSize(const labeled_sample_t sample)
 {
   static const signed char width = ((CHAR_BUFFER_NUM_BYTES - 2) / 3) - 2;
-  static const size_t increment = width + 2;
+  static const size_t increment  = width + 2;
 
   // Initialize Char-array and Char-Pointer Representation of Buffer
   char cbufArray[CHAR_BUFFER_NUM_BYTES];
@@ -324,11 +324,11 @@ void transmitDisplacementFixedSize(const labeled_sample_t sample)
   // Jump by Increment and Fill with Limited Width Float->ASCII
   size_t offset = 2;
   dtostrf(sample.p.dx, width, decimalPlaces, cbuf + offset);
-  cbufArray[offset + width] = FIXED_SIZE_DATA_DELIM;
-  offset += increment;
+  cbufArray[offset + width]  = FIXED_SIZE_DATA_DELIM;
+            offset          += increment;
   dtostrf(sample.p.dy, width, decimalPlaces, cbuf + offset);
-  cbufArray[offset + width] = FIXED_SIZE_DATA_DELIM;
-  offset += increment;
+  cbufArray[offset + width]  = FIXED_SIZE_DATA_DELIM;
+            offset          += increment;
   dtostrf(sample.p.dt, width, decimalPlaces, cbuf + offset);
 
   // Print Buffered Array to Serial
