@@ -33,6 +33,10 @@
 #define CAMERA_FPS 40
 #define SAMPLES_PER_CAMERA_FRAME 12
 
+//Heart-Beat Settings
+#define HEARTBEAT_PERIOD_MILLIS 1000
+#define HEARTBEAT_OUTPUT '\0'
+
 // Buffer Size (comment out CHAR_BUFFER_SIZE_FIXED to try variable size mode)
 #define CHAR_BUFFER_NUM_BYTES 44
 
@@ -78,7 +82,7 @@ const unit_specification_t units = {
     Unit::Time::MICROSECOND};
 const char delimiter = '\t';
 const unsigned char decimalPlaces = 3;
-const bool waitBeforeStart = false;
+const bool waitBeforeStart = true;
 
 // Sensor and Field Names
 typedef String sensor_name_t;
@@ -103,19 +107,37 @@ uint32_t cameraFrameCnt = 0;
 uint32_t sampleCntTarget = 0;
 
 // Declare Test Functions
-static inline void sendFormat();
-static inline void sendAnyUpdate();
+static inline void checkState();
+static inline void sendHeartBeat();
+static inline void startAcquisition() static inline void sendAnyUpdate();
 static inline void checkCmd();
 static inline void captureDisplacement();
+static inline void sendFormat();
 void transmitDisplacementBinary(const labeled_sample_t);
 void transmitDisplacementDelimitedString(const labeled_sample_t);
 void transmitDisplacementFixedSize(const labeled_sample_t);
+
+enum ControllerState
+{
+    SETUP,
+    WAIT,
+    RUN
+} controllerState;
+enum SampleState
+{
+    NONE,
+    CAPTURE, // await sensor integration
+    ACQUIRE,
+    TRANSMIT
+} sampleState;
 
 // =============================================================================
 //   INITIALIZATION
 // =============================================================================
 void setup()
 {
+    controllerState = SETUP;
+
     // Begin Serial
     Serial.begin(115200);
     while (!Serial)
@@ -135,28 +157,14 @@ void setup()
     fastDigitalWrite(SYNC_EVERY_N_PIN, !SYNC_PULSE_STATE);
     fastPinMode(SYNC_OUT_PIN, OUTPUT);
     fastPinMode(SYNC_EVERY_N_PIN, OUTPUT);
-
-    // Print units and Fieldnames (header)
-    sendFormat();
-
-    checkCmd();
-
-    // Start Acquisition
-    usCnt = 0;
-    sensor.left.triggerAcquisitionStart();
-    sensor.right.triggerAcquisitionStart();
-
-    // Send Sync-Every-N Pulse (at start of first and every N subsequent frames)
-    fastDigitalWrite(SYNC_OUT_PIN, SYNC_PULSE_STATE);
-    fastDigitalWrite(SYNC_EVERY_N_PIN, SYNC_PULSE_STATE);
-    syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
-};
+}
 
 // =============================================================================
 //   LOOP
 // =============================================================================
 void loop()
 {
+    checkState();
     sendAnyUpdate();
 
     // Reset Trigger Outputs
@@ -170,8 +178,6 @@ void loop()
             needSyncOutReset = false;
         }
     }
-
-    checkCmd();
 
     // Set Downsampled ("Camera") Trigger Output Every N Samples
     if (--syncEveryNCount <= 0)
@@ -188,47 +194,75 @@ void loop()
     needSyncOutReset = true;
 }
 
-static inline void sendFormat()
+static inline void checkState()
 {
-    const String dunit = getAbbreviation(units.distance);
-    const String tunit = getAbbreviation(units.time);
-    if (format == TransmitFormat::FIXED)
+    // Controller State
+    switch (controllerState)
     {
-        Serial.println("\n\n\n");
-        Serial.println("label\t" + dunit + "\t\t" + dunit + "\t\t" + tunit + "\t" +
-                       "label\t" + dunit + "\t\t" + dunit + "\t\t" + tunit);
-    }
-    else
-    {
+    case (SETUP):
+        // Set initial sample-count to acquire immediately after setup
+        if (waitBeforeStart == false)
+        {
+            sampleCntTarget = UINT32_MAX;
+            startAcquisisition();
+            controllerState = RUN;
+        }
+        else
+        {
+            controllerState = WAIT;
+        }
+    case (WAIT):
+        while (!Serial.available())
+        {
+            sendHeartBeat();
+        }
+        checkCmd();
+        controllerState = RUN;
 
-        Serial.print(
-            String(
-                flatFieldNames[0] + " [" + dunit + "]" + delimiter +
-                flatFieldNames[1] + " [" + dunit + "]" + delimiter +
-                flatFieldNames[2] + " [" + tunit + "]" + delimiter +
-                flatFieldNames[3] + " [" + dunit + "]" + delimiter +
-                flatFieldNames[4] + " [" + dunit + "]" + delimiter +
-                flatFieldNames[5] + " [" + tunit + "]" + delimiter +
-                '\n'));
+    case (RUN):
+    }
+    checkCmd();
+
+    sampleCntTarget--;
+}
+
+static inline void sendHeartBeat()
+{
+    static elapsedMillis heartBeatMillis = 0;
+    if (heartBeatMillis > HEARTBEAT_PERIOD_MILLIS)
+    {
+        Serial.print(HEARTBEAT_OUTPUT);
+        heartBeatMillis -= HEARTBEAT_PERIOD_MILLIS;
     }
 }
 
 static inline void checkCmd()
 {
     // Read Serial to see if request for more frames has been sent
-    if (waitBeforeStart)
+    if (Serial.available())
     {
-        if (Serial.available() || (sampleCntTarget < 0))
-        {
-            while (!Serial.available())
-                delayMicroseconds(100);
-
-            uint32_t moreFramesCnt = Serial.parseInt();
-            sampleCntTarget += (SAMPLES_PER_CAMERA_FRAME * moreFramesCnt);
-            //todo pause
-        }
-        sampleCntTarget--;
+        int32_t moreFramesCnt = Serial.parseInt();
+        sampleCntTarget += (SAMPLES_PER_CAMERA_FRAME * moreFramesCnt);
+        //todo pause
     }
+}
+
+static inline void startAcquisition()
+{
+    // Print units and Fieldnames (header)
+    sendFormat();
+
+    // Reset elapsed microsecond timer for sample duration timing
+    usCnt = 0;
+
+    // Trigger start using class methods in ADNS library
+    sensor.left.triggerAcquisitionStart();
+    sensor.right.triggerAcquisitionStart();
+
+    // Send Sync & "Sync-Every-N" Pulse (for camera) at start of first frame
+    fastDigitalWrite(SYNC_OUT_PIN, SYNC_PULSE_STATE);
+    fastDigitalWrite(SYNC_EVERY_N_PIN, SYNC_PULSE_STATE);
+    syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
 }
 
 static inline void captureDisplacement()
@@ -268,6 +302,31 @@ static inline void sendAnyUpdate()
         default:
             break;
         }
+    }
+}
+
+static inline void sendFormat()
+{
+    const String dunit = getAbbreviation(units.distance);
+    const String tunit = getAbbreviation(units.time);
+    if (format == TransmitFormat::FIXED)
+    {
+        Serial.println("\n\n\n");
+        Serial.println("label\t" + dunit + "\t\t" + dunit + "\t\t" + tunit + "\t" +
+                       "label\t" + dunit + "\t\t" + dunit + "\t\t" + tunit);
+    }
+    else
+    {
+
+        Serial.print(
+            String(
+                flatFieldNames[0] + " [" + dunit + "]" + delimiter +
+                flatFieldNames[1] + " [" + dunit + "]" + delimiter +
+                flatFieldNames[2] + " [" + tunit + "]" + delimiter +
+                flatFieldNames[3] + " [" + dunit + "]" + delimiter +
+                flatFieldNames[4] + " [" + dunit + "]" + delimiter +
+                flatFieldNames[5] + " [" + tunit + "]" + delimiter +
+                '\n'));
     }
 }
 
