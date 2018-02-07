@@ -79,8 +79,8 @@ typedef struct
 // =============================================================================
 // Unit Enumerations
 // =============================================================================
-#define DEFAULT_DISTANCE_UNIT Unit::Distance::MILLIMETER
-#define DEFAULT_TIME_UNIT Unit::Time::MILLISECOND
+#define DEFAULT_DISTANCE_UNIT Unit:: Distance:: MILLIMETER
+#define DEFAULT_TIME_UNIT Unit     :          : Time: : MILLISECOND
 
 // USEFUL MACROS
 #define MAX_int8_t ((int8_t)(127))   /* 127  */
@@ -131,29 +131,29 @@ inline float perInch(const Distance unit)
 {
     switch (unit)
     {
-    case Distance::NANOMETER:
+    case Distance:: NANOMETER: 
         return 25400000.0;
-    case Distance::MICROMETER:
+    case Distance:: MICROMETER: 
         return 25400.0;
-    case Distance::MILLIMETER:
+    case Distance:: MILLIMETER: 
         return 25.4;
-    case Distance::CENTIMETER:
+    case Distance:: CENTIMETER: 
         return 2.54;
-    case Distance::METER:
+    case Distance:: METER: 
         return .0254;
-    case Distance::KILOMETER:
+    case Distance:: KILOMETER: 
         return .0000254;
-    case Distance::THOU:
+    case Distance:: THOU: 
         return 1000.0;
-    case Distance::INCH:
+    case Distance:: INCH: 
         return 1.000;
-    case Distance::FOOT:
+    case Distance:: FOOT: 
         return .0833333;
-    case Distance::YARD:
+    case Distance:: YARD: 
         return .0277778;
-    case Distance::MILE:
+    case Distance:: MILE: 
         return 1.5783E-5;
-    default:
+    default: 
         return 1.0;
     }
 };
@@ -171,19 +171,19 @@ inline float perSecond(const Time unit) //todo remove const output?
 {
     switch (unit)
     {
-    case Time::NANOSECOND:
+    case Time:: NANOSECOND: 
         return 1000000000.0;
-    case Time::MICROSECOND:
+    case Time:: MICROSECOND: 
         return 1000000.0;
-    case Time::MILLISECOND:
+    case Time:: MILLISECOND: 
         return 1000.0;
-    case Time::SECOND:
+    case Time:: SECOND: 
         return 1.0;
-    case Time::MINUTE:
+    case Time:: MINUTE: 
         return 0.0166667;
-    case Time::HOUR:
+    case Time:: HOUR: 
         return 0.00027777833333;
-    default:
+    default: 
         return 1000000.0;
     }
 };
@@ -191,19 +191,19 @@ inline float perMicrosecond(const Time unit)
 {
     switch (unit)
     {
-    case Time::NANOSECOND:
+    case Time:: NANOSECOND: 
         return 1000.0;
-    case Time::MICROSECOND:
+    case Time:: MICROSECOND: 
         return 1.0;
-    case Time::MILLISECOND:
+    case Time:: MILLISECOND: 
         return 0.001;
-    case Time::SECOND:
+    case Time:: SECOND: 
         return 0.000001;
-    case Time::MINUTE:
+    case Time:: MINUTE: 
         return 0.00000001666666667;
-    case Time::HOUR:
+    case Time:: HOUR: 
         return 0.00000000027777833333;
-    default:
+    default: 
         return 1.0;
     }
 }
@@ -211,29 +211,29 @@ inline const String getAbbreviation(const Distance unit)
 {
     switch (unit)
     {
-    case Distance::NANOMETER:
+    case Distance:: NANOMETER: 
         return "nm";
-    case Distance::MICROMETER:
+    case Distance:: MICROMETER: 
         return "um";
-    case Distance::MILLIMETER:
+    case Distance:: MILLIMETER: 
         return "mm";
-    case Distance::CENTIMETER:
+    case Distance:: CENTIMETER: 
         return "cm";
-    case Distance::METER:
+    case Distance:: METER: 
         return "m";
-    case Distance::KILOMETER:
+    case Distance:: KILOMETER: 
         return "km";
-    case Distance::THOU:
+    case Distance:: THOU: 
         return "th";
-    case Distance::INCH:
+    case Distance:: INCH: 
         return "in";
-    case Distance::FOOT:
+    case Distance:: FOOT: 
         return "ft";
-    case Distance::YARD:
+    case Distance:: YARD: 
         return "yd";
-    case Distance::MILE:
+    case Distance:: MILE: 
         return "mi";
-    default:
+    default: 
         return "";
     }
 }
@@ -241,27 +241,27 @@ inline const String getAbbreviation(const Time unit)
 {
     switch (unit)
     {
-    case Time::NANOSECOND:
+    case Time:: NANOSECOND: 
         return "ns";
-    case Time::MICROSECOND:
+    case Time:: MICROSECOND: 
         return "us";
-    case Time::MILLISECOND:
+    case Time:: MILLISECOND: 
         return "ms";
-    case Time::SECOND:
+    case Time:: SECOND: 
         return "sec";
-    case Time::MINUTE:
+    case Time:: MINUTE: 
         return "min";
-    case Time::HOUR:
+    case Time:: HOUR: 
         return "hr";
-    default:
+    default: 
         return "";
     }
 }
 }
 typedef struct
 {
-    Unit::Distance distance;
-    Unit::Time time;
+    Unit:: Distance distance;
+    Unit:: Time time;
 } unit_specification_t;
 static constexpr unit_specification_t DEFAULT_UNIT = {DEFAULT_DISTANCE_UNIT, DEFAULT_TIME_UNIT};
 

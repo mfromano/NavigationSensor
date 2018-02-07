@@ -25,9 +25,9 @@
 // =============================================================================
 class ADNS
 {
-  public:
+  public: 
 	// Constructor
-	ADNS(const int chipSelectPin = 4) : _chipSelectPin(chipSelectPin){};
+	ADNS(const int chipSelectPin = 4): _chipSelectPin(chipSelectPin){};
 
 	// Setup
 	bool begin(const uint16_t resolutionCPI = ADNS_DEFAULT_SENSOR_RESOLUTION,
@@ -74,7 +74,7 @@ class ADNS
 	// Mode Settings
 	void setMotionSensePinInterruptMode(const int pin);
 
-  protected:
+  protected: 
 	// Configuration
 	void initialize();
 	void powerUpSensor();
@@ -87,9 +87,9 @@ class ADNS
 	void setMaxLiftDetectionThreshold();
 
 	// Status Flags
-	bool _configuredFlag = false;
-	bool _initializedFlag = false;
-	volatile bool _runningFlag = false;
+	bool     _configuredFlag    = false;
+	bool     _initializedFlag   = false;
+	volatile bool _runningFlag  = false;
 	volatile bool _selectedFlag = false;
 
 	// Hardware Configuration (Pins) //todo should be made all const
