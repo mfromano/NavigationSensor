@@ -11,7 +11,9 @@
         "name"      : "NavigationSensor-Core",
         "frameworks": "arduino"
     },
-    "include"   : "ADNS9800",
+    "export": {
+        "include": "src/ADNS9800"
+    },
     "platforms" : "*",
     "frameworks": "arduino"
 }
