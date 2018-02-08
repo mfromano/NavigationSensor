@@ -9,7 +9,6 @@
 #include <CircularBuffer.h>
 #include <DigitalIO.h>
 #include <SPI.h>
-#include <elapsedMillis.h>
 
 // Include ADNS Library for ADNS-9800 Sensor
 #include "ADNS9800\ADNS.h"
@@ -22,10 +21,15 @@
 #define SYNC_PULSE_WIDTH_MICROS 500
 #define SYNC_PULSE_STATE HIGH
 
-// Timing Settings (shooting for 480 fps minimum, sync with camera is nominal at
-// this juncture)
-#define CAMERA_FPS 40
+// Timing Settings (shooting for nav-sensor sample-rate 480 fps minimum)
+#define MIN_SAMPLE_RATE 40
 #define SAMPLES_PER_CAMERA_FRAME 12
+
+// Pre-Compute semi-synchronous sample rates for navigation sensors and camera
+#define CAMERA_FPS MIN_SAMPLE_RATE
+constexpr int32_t NAVSENSOR_FPS() {
+  return (MIN_SAMPLE_RATE * SAMPLES_PER_CAMERA_FRAME);
+}
 
 // Heart-Beat Settings
 #define HEARTBEAT_PERIOD_MILLIS 1000
@@ -39,7 +43,27 @@
 #define FIXED_SIZE_DATA_DELIM ','
 #define FIXED_SIZE_MSG_TERMINATOR '\t'
 
+// =============================================================================
+// Timing & Trigger-Output Settings and Implementation
+// =============================================================================
+// // Use zero-jitter & cross-platform Frequency-Timer-2 library for main clock
+// #include <FrequencyTimer2.h>
+
+// Use Interval Timer for Triggering
+#include <IntervalTimer.h>
+
+// Use ElapsedMillis for time-keeping
+#include <elapsedMillis.h>
+
+// // Use AsyncDelay library for simple pulse reset
+// #include <AsyncDelay.h>
+// Use TeensyDelay library for trigger-out pulse reset
+#include <TeensyDelay.h>
+
+// =============================================================================
 // Enumeration and Type Definitions
+// =============================================================================
+// Data-descriptor type (string or char, variable or fixed-width)
 typedef String sensor_name_t;
 typedef String field_name_t;
 
@@ -89,3 +113,8 @@ const String flatFieldNames[] = {
     sensorNames[0] + '_' + fieldNames[0], sensorNames[0] + '_' + fieldNames[1],
     sensorNames[0] + '_' + fieldNames[2], sensorNames[1] + '_' + fieldNames[0],
     sensorNames[1] + '_' + fieldNames[1], sensorNames[1] + '_' + fieldNames[2]};
+
+// typedef struct {
+//   int32_t id;
+//   sampleType
+// } streamSource;
