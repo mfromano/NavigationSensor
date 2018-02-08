@@ -4,6 +4,16 @@
 
 */
 
+// Arduino Includes
+#include <Arduino.h>
+#include <CircularBuffer.h>
+#include <DigitalIO.h>
+#include <SPI.h>
+#include <elapsedMillis.h>
+
+// Include ADNS Library for ADNS-9800 Sensor
+#include "ADNS9800\ADNS.h"
+
 // Pin Settings
 #define CS_PIN_A 4
 #define CS_PIN_B 5
@@ -41,3 +51,12 @@ typedef struct {
   ADNS &left;
   ADNS &right;
 } sensor_pair_t;
+
+// Define data structure for a sample from a single sensor
+typedef struct {
+  char id = 'L';
+  displacement_t p;  // todo: use generic point_t or vec2
+} labeled_sample_t;
+// todo: influxdb format:
+//      --> {key, [field], timestamp}
+//                field -> {field-name, field-value}

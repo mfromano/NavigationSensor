@@ -11,35 +11,18 @@
 #include <SPI.h>
 #include <elapsedMillis.h>
 
+// Include Config-file (moved for code clarity)
+#include "main_config.h"
+
 // Include ADNS Library for ADNS-9800 Sensor
 #include "ADNS9800\ADNS.h"
-
-#include "main_config.h"
 
 // Create Sensor Objects with Specified Slave-Select Pins
 ADNS adnsA(CS_PIN_A);
 ADNS adnsB(CS_PIN_B);
 sensor_pair_t sensor = {adnsA, adnsB};
-typedef struct {
-  char id = 'L';
-  displacement_t p;
-} labeled_sample_t;
 
-// // Trigger-Output Settings and Implementation
-// #include <TimerOne.h>
-// #define TRIGGER_TIMER Timer1
-// // PWM pins: {teensy31: [3,4], uno:[9,10], mega:[11,12,13]}
-// #define TRIGGER_PWM_PIN1 3
-// #define TRIGGER_PWM_PIN2 4
-
-// #include <TimerThree.h>
-// #define TRIGGER_TIMER Timer3
-// mega:[2,3,5]} todo: replace with generic trigger functionality
-//// PWM pins: {teensy31: [25,32], tensy35/6:[29,30],
-// #define TRIGGER_PWM_PIN1 25
-// #define TRIGGER_PWM_PIN2 32
-
-// Synchronous Trigger Rates -> Primary, secondary, ...
+// Trigger-Output Settings and Implementation
 
 // Use zero-jitter & cross-platform Frequency-Timer-2 library
 #include <FrequencyTimer2.h>
