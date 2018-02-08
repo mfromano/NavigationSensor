@@ -11,20 +11,6 @@
 #include <SPI.h>
 #include <elapsedMillis.h>
 
-#if defined(__MK20DX128__) || defined(__MK20DX256__)
-#include <usb_serial.h>  // Teensy 3.0 and 3.1
-#define SERIAL_CLASS usb_serial_class
-#elif defined(_SAM3XA_)
-#include <UARTClass.h>  // Arduino Due
-#define SERIAL_CLASS UARTClass
-#elif defined(USE_USBCON)
-// Arduino Leonardo USB Serial Port
-#define SERIAL_CLASS Serial_
-#else
-#include <HardwareSerial.h>  // Arduino AVR
-#define SERIAL_CLASS HardwareSerial
-#endif
-
 // Include ADNS Library for ADNS-9800 Sensor
 #include "ADNS9800\ADNS.h"
 
