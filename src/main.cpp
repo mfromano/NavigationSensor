@@ -3,19 +3,8 @@
   main.cpp
 
 */
-
-// Arduino Includes
-#include <Arduino.h>
-#include <CircularBuffer.h>
-#include <DigitalIO.h>
-#include <SPI.h>
-#include <elapsedMillis.h>
-
 // Include Config-file (moved for code clarity)
 #include "main_config.h"
-
-// Include ADNS Library for ADNS-9800 Sensor
-#include "ADNS9800\ADNS.h"
 
 // Create Sensor Objects with Specified Slave-Select Pins
 ADNS adnsA(CS_PIN_A);
@@ -44,9 +33,9 @@ struct {
 const TransmitFormat format = TransmitFormat::FIXED;
 const unit_specification_t units = {Unit::Distance::MICROMETER,
                                     Unit::Time::MICROSECOND};
-const char delimiter = '\t';
-const unsigned char decimalPlaces = 3;
-const bool waitBeforeStart = true;
+constexpr char delimiter = '\t';
+constexpr unsigned char decimalPlaces = 3;
+constexpr bool waitBeforeStart = true;
 
 // Sensor and Field Names
 typedef String sensor_name_t;

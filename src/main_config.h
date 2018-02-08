@@ -39,12 +39,9 @@
 #define FIXED_SIZE_DATA_DELIM ','
 #define FIXED_SIZE_MSG_TERMINATOR '\t'
 
-enum class TransmitFormat {
-  FIXED,
-  DELIMITED,
-  JSON,
-  BINARY  // todo binary stream
-};
+// Enumeration and Type Definitions
+typedef String sensor_name_t;
+typedef String field_name_t;
 
 // Define Left-Right Sensor Pair Structure
 typedef struct {
@@ -60,3 +57,35 @@ typedef struct {
 // todo: influxdb format:
 //      --> {key, [field], timestamp}
 //                field -> {field-name, field-value}
+
+enum ControllerState { SETUP, WAIT, RUN } controllerState;
+enum SampleState { NONE, CAPTURE, ACQUIRE, TRANSMIT } sampleState;
+enum class TransmitFormat { FIXED, DELIMITED, JSON, BINARY };
+// todo binary stream
+
+// Declare Test Functions
+static inline void checkState();
+static inline void sendHeartBeat();
+static inline void startAcquisition() static inline void sendAnyUpdate();
+static inline void checkCmd();
+static inline void captureDisplacement();
+static inline void sendFormat();
+void transmitDisplacementBinary(const labeled_sample_t);
+void transmitDisplacementDelimitedString(const labeled_sample_t);
+void transmitDisplacementFixedSize(const labeled_sample_t);
+
+// Delimiter & Precision for Conversion to String
+const TransmitFormat format = TransmitFormat::FIXED;
+const unit_specification_t units = {Unit::Distance::MICROMETER,
+                                    Unit::Time::MICROSECOND};
+constexpr char delimiter = '\t';
+constexpr unsigned char decimalPlaces = 3;
+constexpr bool waitBeforeStart = true;
+
+// Sensor and Field Names
+const sensor_name_t sensorNames[] = {"left", "right"};
+const field_name_t fieldNames[] = {"dx", "dy", "dt"};
+const String flatFieldNames[] = {
+    sensorNames[0] + '_' + fieldNames[0], sensorNames[0] + '_' + fieldNames[1],
+    sensorNames[0] + '_' + fieldNames[2], sensorNames[1] + '_' + fieldNames[0],
+    sensorNames[1] + '_' + fieldNames[1], sensorNames[1] + '_' + fieldNames[2]};
