@@ -4,7 +4,6 @@
 
 */
 // Include Config-file (moved for code clarity)
-#include <timer.h>
 #include "main_config.h"
 
 // Create Sensor Objects with Specified Slave-Select Pins
@@ -12,13 +11,21 @@ ADNS adnsA(CS_PIN_A);
 ADNS adnsB(CS_PIN_B);
 sensor_pair_t sensor = {adnsA, adnsB};
 
+// Create Timing Objects
+
+// Trigger-Outputs
+Ticker hbTicker(sendHeartBeat, HEARTBEAT_PERIOD_MILLIS, 0, MILLIS);
+Ticker cmdTicker(checkCmd, 100, 0, MILLIS);
+
+// LED Outputs
+
 volatile int syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
 // const uint32_t masterClkPeriodMicros = 1e6 / DISPLACEMENT_SAMPLE_RATE;
 
 // Initialize sample buffer
 CircularBuffer<labeled_sample_t, 3> bufA;
 CircularBuffer<labeled_sample_t, 3> bufB;
-uint32_t cameraFrameAcquiredCount = 0;
+// uint32_t cameraFrameAcquiredCount = 0;
 uint32_t sampleCountRemaining = 0;
 
 // =============================================================================
@@ -60,9 +67,9 @@ void loop() {
 
   // Reset Trigger Outputs
   static bool needSyncOutReset = true;
-  while (timeSinceStart.acquisition; < masterClkPeriodMicros) {
+  while (timeSinceStart.acquisition < masterClkPeriodMicros) {
     if (needSyncOutReset &&
-        (timeSinceStart.acquisition; > SYNC_PULSE_strWIDTH_MICROS)) {
+        (timeSinceStart.acquisition > SYNC_PULSE_strWIDTH_MICROS)) {
       fastDigitalWrite(SYNC_OUT_PIN, !SYNC_PULSE_STATE);
       fastDigitalWrite(SYNC_EVERY_N_PIN, !SYNC_PULSE_STATE);
       needSyncOutReset = false;
@@ -78,8 +85,7 @@ void loop() {
   // Initiate Sample Capture
   fastDigitalWrite(SYNC_OUT_PIN, SYNC_PULSE_STATE);
   captureDisplacement();
-  timeSinceStart.acquisition;
-  -= masterClkPeriodMicros;  // timeSinceStart.acquisition;= totalLag?
+  timeSinceStart.acquisition -= masterClkPeriodMicros;
 
   needSyncOutReset = true;
 }
@@ -112,11 +118,11 @@ static inline void checkState() {
 }
 
 static inline void sendHeartBeat() {
-  static elapsedMillis heartBeatMillis = 0;
-  if (heartBeatMillis > HEARTBEAT_PERIOD_MILLIS) {
-    Serial.print(HEARTBEAT_OUTPUT);
-    heartBeatMillis -= HEARTBEAT_PERIOD_MILLIS;
-  }
+  // static elapsedMillis heartBeatMillis = 0;
+  // if (heartBeatMillis > HEARTBEAT_PERIOD_MILLIS) {
+  Serial.print(HEARTBEAT_OUTPUT);
+  // heartBeatMillis -= HEARTBEAT_PERIOD_MILLIS;
+  // }
 }
 
 static inline void checkCmd() {
@@ -130,11 +136,10 @@ static inline void checkCmd() {
 
 static inline void startAcquisition() {
   // Print units and Fieldnames (header)
-  sendFormat();
+  sendHeader();
 
   // Reset elapsed microsecond timer for sample duration timing
-  timeSinceStart.acquisition;
-  = 0;
+  timeSinceStart.acquisition = 0;
 
   // Trigger start using class methods in ADNS library
   sensor.left.triggerAcquisitionStart();
@@ -182,7 +187,7 @@ static inline void sendAnyUpdate() {
   }
 }
 
-static inline void sendFormat() {
+static inline void sendHeader() {
   const String dunit = getAbbreviation(units.distance);
   const String tunit = getAbbreviation(units.time);
   if (format == TransmitFormat::FIXED) {

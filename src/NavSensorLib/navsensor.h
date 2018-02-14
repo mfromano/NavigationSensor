@@ -7,8 +7,8 @@
 #define NAVSENSOR_h
 
 #include <Arduino.h>
-#include <Time.h>
 #include <stdint.h>
+#include "DeviceLib\timestamp.h"
 
 #define COMMAND(NAME) \
   { #NAME, NAME##_command }
@@ -19,6 +19,7 @@
 //   …
 // };
 
+
 // =============================================================================
 // Data-Sample Template Structures
 // =============================================================================
@@ -28,10 +29,10 @@ struct vec2_cartesian {
   T y;
 };
 
-template <class T>
+template <class magtype, class phasetype = magtype>
 struct vec2_polar {
-  T r;
-  float w;
+  magtype r;
+  phasetype w;
 };
 
 template <class T>
@@ -57,7 +58,7 @@ typedef struct {
 } displacement_t;
 
 typedef vec2_cartesian<float> velocity_cartesian_t;
-typedef vec2_polar<float> velocity_polar_t;
+typedef vec2_polar<float,float> velocity_polar_t;
 typedef velocity_cartesian_t velocity_t;
 typedef data_sample<vec2_cartesian<float>> displacement_sample_t;
 typedef data_sample<vec2_cartesian<float>> velocity_sample_t;

@@ -10,6 +10,10 @@
 #include <DigitalIO.h>
 #include <SPI.h>
 
+// Standard Template Library Includes (uCLibC++ port or ETL)
+// #include <"ArduinoSTL.h">
+#include <vector>
+
 // Include ADNS Library for ADNS-9800 Sensor
 #include "ADNS9800\ADNS.h"
 
@@ -47,12 +51,14 @@ constexpr int32_t NAVSENSOR_FPS() {
 // Timing & Trigger-Output Settings and Implementation
 // =============================================================================
 // // Use zero-jitter & cross-platform Frequency-Timer-2 library for main clock
-// #include <FrequencyTimer2.h>
+#include <FrequencyTimer2.h>
 
 // Use Interval Timer for Triggering
 #include <IntervalTimer.h>
+#include <Ticker.h>
 
 // Use ElapsedMillis for time-keeping
+#include <FPSTimer.h>
 #include <elapsedMillis.h>
 
 // // Use AsyncDelay library for simple pulse reset
@@ -76,6 +82,16 @@ typedef struct {
   ADNS &right;
 } sensor_pair_t;
 
+// Message Frame Format
+typedef struct {
+  uint32_t length;
+  enum FrameType : uint8_t { DATA, HEADER, SETTINGS };
+  FrameType type;
+  uint8_t flags;
+  int8_t id;
+
+} message_frame_t;
+
 // Define data structure for a sample from a single sensor
 typedef struct {
   char id = 'L';
@@ -83,7 +99,9 @@ typedef struct {
 } labeled_sample_t;
 // todo: influxdb format:
 //      --> {key, [field], timestamp}
-//                field -> {field-name, field-value}
+//      or  {<measurement>,[tags], [field], timestamp}
+//                field ->  {field-name, field-value}
+//                tag ->    {tag-name, tag-value}
 
 enum ControllerState { SETUP, WAIT, RUN } controllerState;
 enum SampleState { NONE, CAPTURE, ACQUIRE, TRANSMIT } sampleState;
@@ -96,7 +114,7 @@ static inline void sendHeartBeat();
 static inline void startAcquisition() static inline void sendAnyUpdate();
 static inline void checkCmd();
 static inline void captureDisplacement();
-static inline void sendFormat();
+static inline void sendHeader();
 void transmitDisplacementBinary(const labeled_sample_t);
 void transmitDisplacementDelimitedString(const labeled_sample_t);
 void transmitDisplacementFixedSize(const labeled_sample_t);
