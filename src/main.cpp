@@ -4,26 +4,13 @@
 
 */
 // Include Config-file (moved for code clarity)
+#include <timer.h>
 #include "main_config.h"
 
 // Create Sensor Objects with Specified Slave-Select Pins
 ADNS adnsA(CS_PIN_A);
 ADNS adnsB(CS_PIN_B);
 sensor_pair_t sensor = {adnsA, adnsB};
-
-// Trigger-Output Settings and Implementation
-
-// // Use zero-jitter & cross-platform Frequency-Timer-2 library for main clock
-// #include <FrequencyTimer2.h>
-
-// // Use AsyncDelay library for simple pulse reset
-// #include <AsyncDelay.h>
-
-// Use Interval Timer for Triggering
-#include <IntervalTimer.h>
-
-// Use ElapsedMillis for time-keeping
-#include <elapsedMillis.h>
 
 volatile int syncEveryNCount = SAMPLES_PER_CAMERA_FRAME;
 // const uint32_t masterClkPeriodMicros = 1e6 / DISPLACEMENT_SAMPLE_RATE;

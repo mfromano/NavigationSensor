@@ -58,7 +58,10 @@ constexpr int32_t NAVSENSOR_FPS() {
 // // Use AsyncDelay library for simple pulse reset
 // #include <AsyncDelay.h>
 // Use TeensyDelay library for trigger-out pulse reset
-#include <TeensyDelay.h>
+// #include <TeensyDelay.h>
+
+// Embedded Template Library Timer
+// #include <timer.h>
 
 // =============================================================================
 // Enumeration and Type Definitions
