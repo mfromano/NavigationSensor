@@ -18,7 +18,7 @@
 #include "adns_types.h"
 
 // Common Include
-#include "NavSensorLib\navsensor.h"
+#include "NavSensorLib/navsensor.h"
 
 // =============================================================================
 // ADNS Class Declaration

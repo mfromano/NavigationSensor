@@ -8,7 +8,7 @@
 
 #include <Arduino.h>
 #include <stdint.h>
-#include "DeviceLib\timestamp.h"
+#include "DeviceLib/timestamp.h"
 
 #define COMMAND(NAME) \
   { #NAME, NAME##_command }
@@ -19,23 +19,22 @@
 //   …
 // };
 
-
 // =============================================================================
 // Data-Sample Template Structures
 // =============================================================================
-template <class T>
+template <typename T>
 struct vec2_cartesian {
   T x;
   T y;
 };
 
-template <class magtype, class phasetype = magtype>
+template <typename magtype, typename phasetype = typename magtype>
 struct vec2_polar {
   magtype r;
   phasetype w;
 };
 
-template <class T>
+template <typename T>
 struct data_sample {
   time_t time;
   T data;
@@ -58,7 +57,7 @@ typedef struct {
 } displacement_t;
 
 typedef vec2_cartesian<float> velocity_cartesian_t;
-typedef vec2_polar<float,float> velocity_polar_t;
+typedef vec2_polar<float, float> velocity_polar_t;
 typedef velocity_cartesian_t velocity_t;
 typedef data_sample<vec2_cartesian<float>> displacement_sample_t;
 typedef data_sample<vec2_cartesian<float>> velocity_sample_t;
