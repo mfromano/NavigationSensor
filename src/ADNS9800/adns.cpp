@@ -69,16 +69,22 @@ void ADNS::triggerSampleCapture() {
   // Read from Motion or Motion_Burst Address to Latch Data
   SPI.transfer((byte)RegisterAddress::Motion_Burst & 0x7f);
 
-  // Latch Elapsed Microseconds at End Of Sample
-  uint32_t dtLatch = _microsSinceCapture;
-
   // Read Latched Data from Sensor Registers
-  while ((_microsSinceCapture - dtLatch) < _minSamplePeriodUs) {
+  while (_microsSinceCapture < _minSamplePeriodUs) {
+    yield();
   };
   SPI.transfer(_readout.data, adns_readout_max_size);
 
+  // Latch Elapsed Microseconds at End Of Sample
+  uint32_t dtLatch = _microsSinceCapture;
+
   // Release SPI Bus
   deselect();
+
+  // Update Elapsed-Microsecond-Since-Capture Counter
+  _sample.count++;
+  _sample.timestamp = _microsSinceStart;  // position.t;
+  _microsSinceCapture -= dtLatch;
 
   // Update Displacement
   _sample.displacement.dx =
@@ -86,11 +92,6 @@ void ADNS::triggerSampleCapture() {
   _sample.displacement.dy =
       ((int16_t)(_readout.dyL) | ((int16_t)(_readout.dyH) << 8));
   _sample.displacement.dt = dtLatch;  //((capture.endTime - capture.startTime));
-
-  // Update Elapsed-Microsecond-Since-Capture Counter
-  _sample.count++;
-  _sample.timestamp = _microsSinceStart;  // position.t;
-  _microsSinceCapture -= dtLatch;
 
   // Update Current Position Data
   _position.x += _sample.displacement.dx;

@@ -12,12 +12,12 @@ package = navsensor;
 message Displacement {
   required float x    = 1;
   required float y    = 2;
-  optional Duration t = 3;
+  optional sint32 t = 3;
 }
 message Position {
   required float x    = 1;
   required float y    = 2;
-  optional Duration t = 3;
+  optional sint32 t = 3;
 }
 message FrameInfo {
   message Status {
@@ -39,7 +39,9 @@ message FrameInfo {
   optional PeriodMicros period              = 3;   // length of shutter and frame period in microseconds
 }
 
+// =============================================================================
 // Stream/Packet/Bundle/Message Heirarchy
+// =============================================================================
 message DataMessage {
   optional uint32 id = 1;
   oneof data {
@@ -53,6 +55,10 @@ message MessageBundle {
   optional uint32 count    = 2;
   repeated DataMessage msg = 3;
 }
+
+// =============================================================================
+// Generic Messaging format
+// =============================================================================
 message Packet {
   optional Time timestamp = 1;
   optional uint32 seq     = 2;

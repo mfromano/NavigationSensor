@@ -28,10 +28,10 @@ struct vec2_cartesian {
   T y;
 };
 
-template <typename magtype, typename phasetype = typename magtype>
+template <typename T1, typename T2 = T1>
 struct vec2_polar {
-  magtype r;
-  phasetype w;
+  T1 r;
+  T2 w;
 };
 
 template <typename T>
@@ -73,23 +73,7 @@ typedef struct {
 // Unit Enumerations
 // =============================================================================
 #define DEFAULT_DISTANCE_UNIT Unit::Distance::MILLIMETER
-#define DEFAULT_TIME_UNIT \
-  Unit:          : Time: : MILLISECOND
-
-// USEFUL MACROS
-#define MAX_int8_t ((int8_t)(127))   /* 127  */
-#define MIN_int8_t ((int8_t)(-128))  /* -128 */
-#define MAX_uint8_t ((uint8_t)(255)) /* 255  */
-#define MIN_uint8_t ((uint8_t)(0))
-#define MAX_int16_t ((int16_t)(32767))   /* 32767 */
-#define MIN_int16_t ((int16_t)(-32768))  /* -32768 */
-#define MAX_uint16_t ((uint16_t)(65535)) /* 65535 */
-#define MIN_uint16_t ((uint16_t)(0))
-#define MAX_int32_t ((int32_t)(2147483647))      /* 2147483647  */
-#define MIN_int32_t ((int32_t)(-2147483647 - 1)) /* -2147483648 */
-#define MAX_uint32_t ((uint32_t)(0xFFFFFFFFU))   /* 4294967295  */
-#define MIN_uint32_t ((uint32_t)(0))
-#define ARRAY_SIZE(a) sizeof(a) / sizeof(a[0])
+#define DEFAULT_TIME_UNIT Unit::Time::MILLISECOND
 
 // enables streaming-type printing
 template <class T>
