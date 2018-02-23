@@ -5,6 +5,7 @@
 */
 // Include Config-file (moved for code clarity)
 #include "main_config.h"
+const String fileVersion = __TIMESTAMP__;
 
 // Create Sensor Objects with Specified Slave-Select Pins
 ADNS adnsA(CS_PIN_A);
@@ -15,7 +16,7 @@ sensor_pair_t sensor = {adnsA, adnsB};
 const int32_t samplePeriodMicros = 1000000L / (int32_t)NAVSENSOR_FPS;
 
 // Periodic Tasks
-Ticker hbTicker(sendHeartBeat, HEARTBEAT_PERIOD_MILLIS, 0, MILLIS);
+// Ticker hbTicker(sendHeartBeat, HEARTBEAT_PERIOD_MILLIS, 0, MILLIS);
 Ticker cmdTicker(receiveCommand, 100, 0, MILLIS);
 Ticker transmitTicker(sendData, samplePeriodMicros, 0, MICROS);
 
@@ -23,12 +24,12 @@ Ticker transmitTicker(sendData, samplePeriodMicros, 0, MICROS);
 IntervalTimer captureTimer;
 
 // Initialize sample buffer
-CircularBuffer<sensor_sample_t, 3> sensorSampleBuffer;
+CircularBuffer<sensor_sample_t, 10> sensorSampleBuffer;
 
 // Counter and Timestamp Generator
 elapsedMicros usSinceStart;
 time_t currentSampleTimestamp;
-uint32_t sampleCountRemaining = 0;
+uint32_t sampleCountRemaining = -1;
 
 volatile bool isRunning = false;
 
@@ -50,8 +51,9 @@ void setup() {
   if (success) {
     Serial.println("Triggers initialized");
   }
+  // sampleCountRemaining = 480;
   cmdTicker.start();
-  hbTicker.start();
+  // hbTicker.start();
   transmitTicker.start();
 }
 
@@ -67,7 +69,7 @@ void loop() {
   }
   transmitTicker.update();
   cmdTicker.update();
-  hbTicker.update();
+  // hbTicker.update();
 }
 
 // =============================================================================
@@ -111,6 +113,7 @@ static inline void sendHeartBeat() { Serial.print(HEARTBEAT_OUTPUT); }
 static inline void receiveCommand() {
   // Read Serial to see if request for more frames has been sent
   if (Serial.available()) {
+    // delayMicroseconds(1000);
     int32_t moreSamplesCnt = Serial.parseInt();
     sampleCountRemaining += moreSamplesCnt;
   }
@@ -149,7 +152,7 @@ static inline void stopAcquisition() {
 // =============================================================================
 // TASKS: TRIGGERED_ACQUISITION
 // =============================================================================
-static inline void captureDisplacement() {
+void captureDisplacement() {
   // Initialize container for combined & stamped sample
   sensor_sample_t currentSample;
   currentSample.timestamp = currentSampleTimestamp;
@@ -174,9 +177,10 @@ static inline void captureDisplacement() {
 // TASKS: DATA_TRANSFER
 // =============================================================================
 
-static inline void sendHeader() {
+void sendHeader() {
   const String dunit = getAbbreviation(units.distance);
   const String tunit = getAbbreviation(units.time);
+  Serial.flush();
   Serial.println(String(
       "timestamp [us]" + delimiter + flatFieldNames[0] + " [" + dunit + "]" +
       delimiter + flatFieldNames[1] + " [" + dunit + "]" + delimiter +
@@ -185,7 +189,7 @@ static inline void sendHeader() {
       delimiter + flatFieldNames[5] + " [" + tunit + "]"));
 }
 
-static inline void sendData() {
+void sendData() {
   // Print Velocity
   while (!(sensorSampleBuffer.isEmpty())) {
     sensor_sample_t sample = sensorSampleBuffer.shift();
@@ -199,6 +203,7 @@ static inline void sendData() {
     const String dyR = String(sample.right.p.dy, decimalPlaces);
     const String dtR = String(sample.right.p.dt, decimalPlaces);
 
+    // Serial.availableForWrite
     // Print ASCII Strings
     Serial.println(timestamp + delimiter + dxL + delimiter + dyL + delimiter +
                    dtL + delimiter + dxR + delimiter + dyR + delimiter + dtR);

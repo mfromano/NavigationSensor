@@ -18,10 +18,10 @@
 #include "ADNS9800\ADNS.h"
 
 // Pin Settings
-const int CS_PIN_A = 4, CS_PIN_B = 5;
+const int CS_PIN_A = 20, CS_PIN_B = 21;
 
 // Pre-Compute semi-synchronous sample rates for navigation sensors and camera
-const int32_t NAVSENSOR_FPS = 480;
+const int32_t NAVSENSOR_FPS = 120;
 
 // Heart-Beat Settings
 const int HEARTBEAT_PERIOD_MILLIS = 1000;
@@ -115,11 +115,11 @@ static inline void stopAcquisition();
 
 // Task: TRIGGERED_ACQUISITION
 // (capture/acquire/read-loop)
-static inline void captureDisplacement();
+static void captureDisplacement();
 
 // Task: DATA_TRANSFER
-static inline void sendHeader();
-static inline void sendData();
+static void sendHeader();
+static void sendData();
 
 // todo: influxdb format:
 //      --> {key, [field], timestamp}
