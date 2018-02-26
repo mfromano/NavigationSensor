@@ -38,18 +38,18 @@ volatile bool isRunning = false;
 void setup() {
   bool success;
   success = initializeCommunication();
-  if (success) {
-    Serial.println("Communication initialized");
-    Serial.println(fileVersion);
-  }
+  // if (success) {
+  // Serial.println("Communication initialized");
+  // Serial.println(fileVersion);
+  // }
   success = initializeSensors();
-  if (success) {
-    Serial.println("Sensors initialized");
-  }
+  // if (success) {
+  // Serial.println("Sensors initialized");
+  // }
   success = initializeTriggering();
-  if (success) {
-    Serial.println("Triggers initialized");
-  }
+  // if (success) {
+  // Serial.println("Triggers initialized");
+  // }
   // sampleCountRemaining = 480;
   cmdTicker.start();
   // transmitTicker.start();
@@ -144,12 +144,12 @@ static inline void startAcquisition() {
 }
 
 static inline void stopAcquisition() {
+  // End IntervalTimer
+  captureTimer.end();
+
   // Trigger start using class methods in ADNS library
   sensor.left.triggerAcquisitionStop();
   sensor.right.triggerAcquisitionStop();
-
-  // Begin IntervalTimer
-  captureTimer.end();
 
   // Change state
   isRunning = false;
@@ -208,10 +208,10 @@ void captureDisplacement() {
 void sendHeader() {
   const String dunit = getAbbreviation(units.distance);
   const String tunit = getAbbreviation(units.time);
-  Serial.flush();
+  // Serial.flush();
   Serial.print(String(
-      "timestamp [us]" + delimiter + flatFieldNames[0] + " [" + dunit + "]" +
-      delimiter + flatFieldNames[1] + " [" + dunit + "]" + delimiter +
+      String("timestamp [us]") + delimiter + flatFieldNames[0] + " [" + dunit +
+      "]" + delimiter + flatFieldNames[1] + " [" + dunit + "]" + delimiter +
       flatFieldNames[2] + " [" + tunit + "]" + delimiter + flatFieldNames[3] +
       " [" + dunit + "]" + delimiter + flatFieldNames[4] + " [" + dunit + "]" +
       delimiter + flatFieldNames[5] + " [" + tunit + "]" + "\n"));

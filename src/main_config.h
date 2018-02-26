@@ -21,13 +21,14 @@
 #include "ADNS9800\ADNS.h"
 
 // Pin Settings
-const int CS_PIN_A = 20, CS_PIN_B = 21;
+const int CS_PIN_A = 20;
+const int CS_PIN_B = 21;
 const int TRIGGER_IN_PIN = 0;
 const int TRIGGER_OUT_1_PIN = 4;
 const int TRIGGER_OUT_2_PIN = 5;
 const int TRIGGER_OUT_3_PIN = 6;
-const bool TRIGGER_ACTIVE_STATE = HIGH;
 const int MANUAL_TRIGGER_PIN = 7;
+const bool TRIGGER_ACTIVE_STATE = HIGH;
 
 // Pre-Compute semi-synchronous sample rates for navigation sensors and camera
 const int NAVSENSOR_FPS = 120;
