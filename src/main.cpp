@@ -17,7 +17,7 @@ const int32_t samplePeriodMicros = 1000000L / (int32_t)NAVSENSOR_FPS;
 
 // Periodic Tasks
 Ticker cmdTicker(receiveCommand, 100, 0, MILLIS);
-Ticker transmitTicker(sendData, samplePeriodMicros, 0, MICROS);
+// Ticker transmitTicker(sendData, samplePeriodMicros, 0, MICROS);
 
 // Capture Task (on interrupt)
 IntervalTimer captureTimer;
@@ -27,8 +27,8 @@ CircularBuffer<sensor_sample_t, 10> sensorSampleBuffer;
 
 // Counter and Timestamp Generator
 elapsedMicros usSinceStart;
-time_t currentSampleTimestamp;
-uint32_t sampleCountRemaining = 0;
+volatile time_t currentSampleTimestamp;
+volatile int32_t sampleCountRemaining = 0;
 
 volatile bool isRunning = false;
 
@@ -37,10 +37,10 @@ volatile bool isRunning = false;
 // =============================================================================
 void setup() {
   bool success;
-
   success = initializeCommunication();
   if (success) {
     Serial.println("Communication initialized");
+    Serial.println(fileVersion);
   }
   success = initializeSensors();
   if (success) {
@@ -52,11 +52,11 @@ void setup() {
   }
   // sampleCountRemaining = 480;
   cmdTicker.start();
-  transmitTicker.start();
+  // transmitTicker.start();
 }
 
 void loop() {
-  if (sampleCountRemaining > 0) {
+  if (sampleCountRemaining > 0 || !fastDigitalRead(MANUAL_TRIGGER_PIN)) {
     if (!isRunning) {
       startAcquisition();
     }
@@ -65,7 +65,7 @@ void loop() {
       stopAcquisition();
     }
   }
-  transmitTicker.update();
+  // transmitTicker.update();
   cmdTicker.update();
   // hbTicker.update();
 }
@@ -92,13 +92,17 @@ bool initializeSensors() {
 };
 bool initializeClocks() { return true; }
 bool initializeTriggering() {
+  // Set Sync In Pin Mode
+  fastPinMode(TRIGGER_IN_PIN, INPUT);
+  fastPinMode(MANUAL_TRIGGER_PIN, INPUT_PULLUP);
   // Set Sync Out Pin Modes
-  // fastDigitalWrite(SYNC_OUT_PIN, !SYNC_PULSE_STATE);
-  // fastDigitalWrite(SYNC_EVERY_N_PIN, !SYNC_PULSE_STATE);
-  // fastPinMode(SYNC_OUT_PIN, OUTPUT);
-  // fastPinMode(SYNC_EVERY_N_PIN, OUTPUT);
+  fastDigitalWrite(TRIGGER_OUT_1_PIN, !TRIGGER_ACTIVE_STATE);
+  fastDigitalWrite(TRIGGER_OUT_2_PIN, !TRIGGER_ACTIVE_STATE);
+  fastDigitalWrite(TRIGGER_OUT_3_PIN, !TRIGGER_ACTIVE_STATE);
+  fastPinMode(TRIGGER_OUT_1_PIN, OUTPUT);
+  fastPinMode(TRIGGER_OUT_2_PIN, OUTPUT);
+  fastPinMode(TRIGGER_OUT_3_PIN, OUTPUT);
   // Setup Sync/Trigger-Output Timing
-  // Timer1.initialize(masterClkPeriodMicros);
   // FrequencyTimer2::setPeriod(1e6 / DISPLACEMENT_SAMPLE_RATE)
   return true;
 };
@@ -132,6 +136,11 @@ static inline void startAcquisition() {
 
   // Begin IntervalTimer
   captureTimer.begin(captureDisplacement, samplePeriodMicros);
+
+  // Set Trigger-Out-1 to indicate Running
+  fastDigitalWrite(TRIGGER_OUT_1_PIN, TRIGGER_ACTIVE_STATE);
+  fastDigitalWrite(TRIGGER_OUT_2_PIN, TRIGGER_ACTIVE_STATE);
+  fastDigitalWrite(TRIGGER_OUT_3_PIN, TRIGGER_ACTIVE_STATE);
 }
 
 static inline void stopAcquisition() {
@@ -144,12 +153,21 @@ static inline void stopAcquisition() {
 
   // Change state
   isRunning = false;
+
+  // UnSet Trigger-Out to indicate Running
+  fastDigitalWrite(TRIGGER_OUT_1_PIN, !TRIGGER_ACTIVE_STATE);
+  fastDigitalWrite(TRIGGER_OUT_2_PIN, !TRIGGER_ACTIVE_STATE);
+  fastDigitalWrite(TRIGGER_OUT_3_PIN, !TRIGGER_ACTIVE_STATE);
 }
 
 // =============================================================================
 // TASKS: TRIGGERED_ACQUISITION
 // =============================================================================
 void captureDisplacement() {
+  // Unset Trigger Outputs
+  fastDigitalWrite(TRIGGER_OUT_2_PIN, !TRIGGER_ACTIVE_STATE);
+  fastDigitalWrite(TRIGGER_OUT_3_PIN, !TRIGGER_ACTIVE_STATE);
+
   // Initialize container for combined & stamped sample
   sensor_sample_t currentSample;
   currentSample.timestamp = currentSampleTimestamp;
@@ -166,8 +184,21 @@ void captureDisplacement() {
   sensorSampleBuffer.push(currentSample);
 
   // Decrement sample counter and time counter
-  sampleCountRemaining--;
+  if (sampleCountRemaining >= 0) {
+    sampleCountRemaining--;
+  }
   currentSampleTimestamp = usSinceStart;
+
+  // Reset Trigger Outputs
+  fastDigitalWrite(TRIGGER_OUT_2_PIN, TRIGGER_ACTIVE_STATE);
+  static int triggerOut3Cnt = TRIGGER_OUT_3_DIVISOR;
+  if (--triggerOut3Cnt <= 0) {
+    fastDigitalWrite(TRIGGER_OUT_3_PIN, TRIGGER_ACTIVE_STATE);
+    triggerOut3Cnt = TRIGGER_OUT_3_DIVISOR;
+  }
+
+  // Send Data
+  sendData();
 }
 
 // =============================================================================
@@ -178,12 +209,12 @@ void sendHeader() {
   const String dunit = getAbbreviation(units.distance);
   const String tunit = getAbbreviation(units.time);
   Serial.flush();
-  Serial.println(String(
+  Serial.print(String(
       "timestamp [us]" + delimiter + flatFieldNames[0] + " [" + dunit + "]" +
       delimiter + flatFieldNames[1] + " [" + dunit + "]" + delimiter +
       flatFieldNames[2] + " [" + tunit + "]" + delimiter + flatFieldNames[3] +
       " [" + dunit + "]" + delimiter + flatFieldNames[4] + " [" + dunit + "]" +
-      delimiter + flatFieldNames[5] + " [" + tunit + "]"));
+      delimiter + flatFieldNames[5] + " [" + tunit + "]" + "\n"));
 }
 
 void sendData() {
@@ -199,10 +230,12 @@ void sendData() {
     const String dxR = String(sample.right.p.dx, decimalPlaces);
     const String dyR = String(sample.right.p.dy, decimalPlaces);
     const String dtR = String(sample.right.p.dt, decimalPlaces);
+    const String endline = String("\n");
 
     // Serial.availableForWrite
     // Print ASCII Strings
-    Serial.println(timestamp + delimiter + dxL + delimiter + dyL + delimiter +
-                   dtL + delimiter + dxR + delimiter + dyR + delimiter + dtR);
+    Serial.print(timestamp + delimiter + dxL + delimiter + dyL + delimiter +
+                 dtL + delimiter + dxR + delimiter + dyR + delimiter + dtR +
+                 endline);
   }
 }
