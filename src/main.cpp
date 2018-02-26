@@ -16,7 +16,6 @@ sensor_pair_t sensor = {adnsA, adnsB};
 const int32_t samplePeriodMicros = 1000000L / (int32_t)NAVSENSOR_FPS;
 
 // Periodic Tasks
-// Ticker hbTicker(sendHeartBeat, HEARTBEAT_PERIOD_MILLIS, 0, MILLIS);
 Ticker cmdTicker(receiveCommand, 100, 0, MILLIS);
 Ticker transmitTicker(sendData, samplePeriodMicros, 0, MICROS);
 
@@ -29,7 +28,7 @@ CircularBuffer<sensor_sample_t, 10> sensorSampleBuffer;
 // Counter and Timestamp Generator
 elapsedMicros usSinceStart;
 time_t currentSampleTimestamp;
-uint32_t sampleCountRemaining = -1;
+uint32_t sampleCountRemaining = 0;
 
 volatile bool isRunning = false;
 
@@ -53,7 +52,6 @@ void setup() {
   }
   // sampleCountRemaining = 480;
   cmdTicker.start();
-  // hbTicker.start();
   transmitTicker.start();
 }
 
@@ -108,8 +106,6 @@ bool initializeTriggering() {
 // =============================================================================
 // TASKS: IDLE
 // =============================================================================
-static inline void sendHeartBeat() { Serial.print(HEARTBEAT_OUTPUT); }
-
 static inline void receiveCommand() {
   // Read Serial to see if request for more frames has been sent
   if (Serial.available()) {
@@ -137,6 +133,7 @@ static inline void startAcquisition() {
   // Begin IntervalTimer
   captureTimer.begin(captureDisplacement, samplePeriodMicros);
 }
+
 static inline void stopAcquisition() {
   // Trigger start using class methods in ADNS library
   sensor.left.triggerAcquisitionStop();

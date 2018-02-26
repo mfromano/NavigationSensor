@@ -9,6 +9,9 @@
 #include <CircularBuffer.h>
 #include <DigitalIO.h>
 #include <SPI.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <time.h>
 
 // Standard Template Library Includes (uCLibC++ port or ETL)
 // #include <"ArduinoSTL.h">
@@ -21,11 +24,7 @@
 const int CS_PIN_A = 20, CS_PIN_B = 21;
 
 // Pre-Compute semi-synchronous sample rates for navigation sensors and camera
-const int32_t NAVSENSOR_FPS = 120;
-
-// Heart-Beat Settings
-const int HEARTBEAT_PERIOD_MILLIS = 1000;
-const char HEARTBEAT_OUTPUT = '\0';
+const int NAVSENSOR_FPS = 120;
 
 // =============================================================================
 // Timing & Trigger-Output Settings and Implementation
