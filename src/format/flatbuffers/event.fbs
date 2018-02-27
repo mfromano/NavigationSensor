@@ -17,7 +17,7 @@ table DataPoint {
     value:[ubyte](flexbuffer); 
 }
 table DataFrame {
-    frame_id:(key); 
+    frame_id:int32(key); 
     time_start:int64; 
     time_stop:int64; 
     data:[DataPoint]; 
@@ -28,23 +28,23 @@ table Tag {
     key:string; 
     value:[ubyte] (flexbuffer); 
 }
-struct UnitInfo {
+table UnitInfo {
     
 }
-struct NumberInfo {
-    unit:UnitInfo
-    min:Data
-    max:Data
-    resolution:Data
+table NumberInfo {
+    unit:UnitInfo;
+    min:Data;
+    max:Data;
+    resolution:Data;
     num_bytes:uint8; 
 }
 table DataSeriesInfo {
     index:int32 (key); 
     type_code:flatbuffers::Type; 
-    field_name:string
+    field_name:string;
     sensor_id:int32; 
     device_id:int32; 
-    meta_data:[object]
+    meta_data:[object];
 }
 table DataSeriesRegistry {
     series_count:uint16; 
