@@ -42,10 +42,8 @@ const int TRIGGER_OUT_3_DIVISOR = 12;
 
 // Use Interval Timer for Triggering
 #include <IntervalTimer.h>
-#include <Ticker.h>
 
 // Use ElapsedMillis for time-keeping
-#include <FPSTimer.h>
 #include <elapsedMillis.h>
 
 // // Use AsyncDelay library for simple pulse reset
@@ -116,8 +114,8 @@ bool initializeCommunication();
 
 // Task: IDLE
 static inline void receiveCommand();
-static inline void startAcquisition();
-static inline void stopAcquisition();
+static inline void beginAcquisition();
+static inline void endAcquisition();
 
 // Task: TRIGGERED_ACQUISITION
 // (capture/acquire/read-loop)

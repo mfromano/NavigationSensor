@@ -16,7 +16,7 @@ sensor_pair_t sensor = {adnsA, adnsB};
 const int32_t samplePeriodMicros = 1000000L / (int32_t)NAVSENSOR_FPS;
 
 // Periodic Tasks
-Ticker cmdTicker(receiveCommand, 100, 0, MILLIS);
+// Ticker cmdTicker(receiveCommand, 100, 0, MILLIS);
 // Ticker transmitTicker(sendData, samplePeriodMicros, 0, MICROS);
 
 // Capture Task (on interrupt)
@@ -26,7 +26,7 @@ IntervalTimer captureTimer;
 CircularBuffer<sensor_sample_t, 10> sensorSampleBuffer;
 
 // Counter and Timestamp Generator
-elapsedMicros usSinceStart;
+elapsedMicros microsSinceAcquisitionStart;
 volatile time_t currentSampleTimestamp;
 volatile int32_t sampleCountRemaining = 0;
 
@@ -36,8 +36,10 @@ volatile bool isRunning = false;
 //   SETUP & LOOP
 // =============================================================================
 void setup() {
+  delay(20);
   bool success;
   success = initializeCommunication();
+  delay(20);
   // if (success) {
   // Serial.println("Communication initialized");
   // Serial.println(fileVersion);
@@ -51,22 +53,27 @@ void setup() {
   // Serial.println("Triggers initialized");
   // }
   // sampleCountRemaining = 480;
-  cmdTicker.start();
+  // cmdTicker.start();
   // transmitTicker.start();
+  delay(20);
 }
 
 void loop() {
   if (sampleCountRemaining > 0 || !fastDigitalRead(MANUAL_TRIGGER_PIN)) {
     if (!isRunning) {
-      startAcquisition();
+      beginAcquisition();
     }
   } else {
     if (isRunning) {
-      stopAcquisition();
+      // Debounce/delay acquisition stop
+      // delay(10);
+      endAcquisition();
+      delay(10);
     }
+    receiveCommand();
   }
   // transmitTicker.update();
-  cmdTicker.update();
+  // cmdTicker.update();
   // hbTicker.update();
 }
 
@@ -119,7 +126,7 @@ static inline void receiveCommand() {
   }
 }
 
-static inline void startAcquisition() {
+static inline void beginAcquisition() {
   // Print units and Fieldnames (header)
   sendHeader();
 
@@ -131,8 +138,8 @@ static inline void startAcquisition() {
   isRunning = true;
 
   // Reset Elapsed Time Counter
-  usSinceStart = 0;
-  currentSampleTimestamp = usSinceStart;
+  microsSinceAcquisitionStart = 0;
+  currentSampleTimestamp = microsSinceAcquisitionStart;
 
   // Begin IntervalTimer
   captureTimer.begin(captureDisplacement, samplePeriodMicros);
@@ -143,7 +150,7 @@ static inline void startAcquisition() {
   fastDigitalWrite(TRIGGER_OUT_3_PIN, TRIGGER_ACTIVE_STATE);
 }
 
-static inline void stopAcquisition() {
+static inline void endAcquisition() {
   // End IntervalTimer
   captureTimer.end();
 
@@ -187,7 +194,7 @@ void captureDisplacement() {
   if (sampleCountRemaining >= 0) {
     sampleCountRemaining--;
   }
-  currentSampleTimestamp = usSinceStart;
+  currentSampleTimestamp = microsSinceAcquisitionStart;
 
   // Reset Trigger Outputs
   fastDigitalWrite(TRIGGER_OUT_2_PIN, TRIGGER_ACTIVE_STATE);
