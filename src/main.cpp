@@ -15,35 +15,41 @@ sensor_pair_t sensor = {adnsA, adnsB};
 // Create Timing Objects
 const int32_t samplePeriodMicros = 1000000L / (int32_t)NAVSENSOR_FPS;
 
-// Periodic Tasks
-// Ticker cmdTicker(receiveCommand, 100, 0, MILLIS);
-// Ticker transmitTicker(sendData, samplePeriodMicros, 0, MICROS);
-
 // Capture Task (on interrupt)
 IntervalTimer captureTimer;
+
+// Create debounced manual input button
+Bounce onoffSwitch;
 
 // Initialize sample buffer
 CircularBuffer<sensor_sample_t, 10> sensorSampleBuffer;
 
 // Counter and Timestamp Generator
 elapsedMicros microsSinceAcquisitionStart;
-volatile time_t currentSampleTimestamp;
+elapsedMicros microsSinceFrameStart;
+// volatile time_t currentSampleTimestamp;
 volatile int32_t sampleCountRemaining = 0;
+volatile time_t currentFrameTimestamp;
+volatile time_t currentFrameDuration;
+volatile uint32_t currentFrameCount;
 
 volatile bool isRunning = false;
 
 // =============================================================================
 //   SETUP & LOOP
 // =============================================================================
+#include "DeviceLib/devicemanager.h"
 void setup() {
-  delay(20);
+  delay(400);
   bool success;
   success = initializeCommunication();
-  delay(20);
-  // if (success) {
-  // Serial.println("Communication initialized");
-  // Serial.println(fileVersion);
-  // }
+  if (success) {
+    Serial.println("Communication initialized");
+    Serial.println(fileVersion);
+  }
+  delay(400);
+  printBoardID();
+
   success = initializeSensors();
   // if (success) {
   // Serial.println("Sensors initialized");
@@ -55,32 +61,42 @@ void setup() {
   // sampleCountRemaining = 480;
   // cmdTicker.start();
   // transmitTicker.start();
-  delay(20);
+  // delay(20);
 }
 
 void loop() {
-  if (sampleCountRemaining > 0 || !fastDigitalRead(MANUAL_TRIGGER_PIN)) {
-    if (!isRunning) {
+  if (onoffSwitch.update()) {
+    if (onoffSwitch.fell()) {
+      Serial.println("falling edge");
       beginAcquisition();
+    } else {
+      if (onoffSwitch.rose()) {
+        Serial.println("rising edge");
+        endAcquisition();
+      }
     }
-  } else {
-    if (isRunning) {
-      // Debounce/delay acquisition stop
-      // delay(10);
-      endAcquisition();
-      delay(10);
-    }
-    receiveCommand();
   }
-  // transmitTicker.update();
-  // cmdTicker.update();
-  // hbTicker.update();
+
+  // if (sampleCountRemaining > 0 {
+  //   if (!isRunning) {
+  //     beginAcquisition();
+  //   }
+  // } else {
+  //   if (isRunning) {
+  //     endAcquisition();
+  //     delay(10);
+  //   }
+  //   receiveCommand();
+  // }
+  // // transmitTicker.update();
+  // // cmdTicker.update();
+  // // hbTicker.update();
 }
 
 // =============================================================================
 //   TASKS: INITIALIZE
 // =============================================================================
-bool initializeCommunication() {
+inline static bool initializeCommunication() {
   // Begin Serial
   Serial.begin(115200);
   while (!Serial) {
@@ -89,7 +105,7 @@ bool initializeCommunication() {
   delay(10);
   return true;
 };
-bool initializeSensors() {
+inline static bool initializeSensors() {
   // Begin Sensors
   sensor.left.begin();
   delay(30);
@@ -97,18 +113,21 @@ bool initializeSensors() {
   delay(30);
   return true;
 };
-bool initializeClocks() { return true; }
-bool initializeTriggering() {
+inline static bool initializeClocks() { return true; }
+inline static bool initializeTriggering() {
   // Set Sync In Pin Mode
-  fastPinMode(TRIGGER_IN_PIN, INPUT);
-  fastPinMode(MANUAL_TRIGGER_PIN, INPUT_PULLUP);
+  fastPinMode(TRIGGER_IN_PIN, INPUT_PULLUP);
+  // fastPinMode(MANUAL_TRIGGER_PIN, INPUT_PULLUP);
+  onoffSwitch.attach(MANUAL_TRIGGER_PIN, INPUT_PULLUP);
+  onoffSwitch.interval(50);
   // Set Sync Out Pin Modes
-  fastDigitalWrite(TRIGGER_OUT_1_PIN, !TRIGGER_ACTIVE_STATE);
-  fastDigitalWrite(TRIGGER_OUT_2_PIN, !TRIGGER_ACTIVE_STATE);
-  fastDigitalWrite(TRIGGER_OUT_3_PIN, !TRIGGER_ACTIVE_STATE);
   fastPinMode(TRIGGER_OUT_1_PIN, OUTPUT);
   fastPinMode(TRIGGER_OUT_2_PIN, OUTPUT);
   fastPinMode(TRIGGER_OUT_3_PIN, OUTPUT);
+  fastDigitalWrite(TRIGGER_OUT_1_PIN, !TRIGGER_ACTIVE_STATE);
+  fastDigitalWrite(TRIGGER_OUT_2_PIN, !TRIGGER_ACTIVE_STATE);
+  fastDigitalWrite(TRIGGER_OUT_3_PIN, !TRIGGER_ACTIVE_STATE);
+  delay(1);
   // Setup Sync/Trigger-Output Timing
   // FrequencyTimer2::setPeriod(1e6 / DISPLACEMENT_SAMPLE_RATE)
   return true;
@@ -127,44 +146,66 @@ static inline void receiveCommand() {
 }
 
 static inline void beginAcquisition() {
-  // Print units and Fieldnames (header)
-  sendHeader();
+  if (!isRunning) {
+    // Print units and Fieldnames (header)
+    sendHeader();
 
-  // Trigger start using class methods in ADNS library
-  sensor.left.triggerAcquisitionStart();
-  sensor.right.triggerAcquisitionStart();
+    // Trigger start using class methods in ADNS library
+    sensor.left.triggerAcquisitionStart();
+    sensor.right.triggerAcquisitionStart();
 
-  // Change State
-  isRunning = true;
+    // Flush sensors (should happen automatically -> needs bug fix)
+    sensor.left.triggerSampleCapture();
+    sensor.right.triggerSampleCapture();
 
-  // Reset Elapsed Time Counter
-  microsSinceAcquisitionStart = 0;
-  currentSampleTimestamp = microsSinceAcquisitionStart;
+    // Change State
+    isRunning = true;
+    currentFrameCount = 0;
 
-  // Begin IntervalTimer
-  captureTimer.begin(captureDisplacement, samplePeriodMicros);
+    // Reset Elapsed Time Counter
+    microsSinceAcquisitionStart = 0;
+    // currentSampleTimestamp = microsSinceAcquisitionStart;
+    microsSinceFrameStart = microsSinceAcquisitionStart;
+    currentFrameDuration = microsSinceFrameStart;
+    beginDataFrame();
 
-  // Set Trigger-Out-1 to indicate Running
-  fastDigitalWrite(TRIGGER_OUT_1_PIN, TRIGGER_ACTIVE_STATE);
-  fastDigitalWrite(TRIGGER_OUT_2_PIN, TRIGGER_ACTIVE_STATE);
-  fastDigitalWrite(TRIGGER_OUT_3_PIN, TRIGGER_ACTIVE_STATE);
+    // Begin IntervalTimer
+    captureTimer.begin(captureDisplacement, samplePeriodMicros);
+
+    // Set Trigger-Out-1 to indicate Running
+    fastDigitalWrite(TRIGGER_OUT_1_PIN, TRIGGER_ACTIVE_STATE);
+    fastDigitalWrite(TRIGGER_OUT_2_PIN, TRIGGER_ACTIVE_STATE);
+    fastDigitalWrite(TRIGGER_OUT_3_PIN, TRIGGER_ACTIVE_STATE);
+  }
 }
-
+static inline void beginDataFrame() {
+  // Latch timestamp and designate/allocate current sample
+  microsSinceFrameStart -= currentFrameDuration;
+  currentFrameTimestamp = microsSinceAcquisitionStart;
+  currentFrameCount += 1;
+}
+static inline void endDataFrame() {
+  // Latch Frame Duration and Send Data
+  currentFrameDuration = microsSinceFrameStart;
+}
 static inline void endAcquisition() {
-  // End IntervalTimer
-  captureTimer.end();
+  if (isRunning) {
+    // End IntervalTimer
+    captureTimer.end();
 
-  // Trigger start using class methods in ADNS library
-  sensor.left.triggerAcquisitionStop();
-  sensor.right.triggerAcquisitionStop();
+    // Trigger start using class methods in ADNS library
+    sensor.left.triggerAcquisitionStop();
+    sensor.right.triggerAcquisitionStop();
+    sensorSampleBuffer.clear();
 
-  // Change state
-  isRunning = false;
+    // Change state
+    isRunning = false;
 
-  // UnSet Trigger-Out to indicate Running
-  fastDigitalWrite(TRIGGER_OUT_1_PIN, !TRIGGER_ACTIVE_STATE);
-  fastDigitalWrite(TRIGGER_OUT_2_PIN, !TRIGGER_ACTIVE_STATE);
-  fastDigitalWrite(TRIGGER_OUT_3_PIN, !TRIGGER_ACTIVE_STATE);
+    // UnSet Trigger-Out to indicate Running
+    fastDigitalWrite(TRIGGER_OUT_1_PIN, !TRIGGER_ACTIVE_STATE);
+    fastDigitalWrite(TRIGGER_OUT_2_PIN, !TRIGGER_ACTIVE_STATE);
+    fastDigitalWrite(TRIGGER_OUT_3_PIN, !TRIGGER_ACTIVE_STATE);
+  }
 }
 
 // =============================================================================
@@ -177,11 +218,14 @@ void captureDisplacement() {
 
   // Initialize container for combined & stamped sample
   sensor_sample_t currentSample;
-  currentSample.timestamp = currentSampleTimestamp;
+  currentSample.timestamp = currentFrameTimestamp;
 
   // Trigger capture from each sensor
   sensor.left.triggerSampleCapture();
   sensor.right.triggerSampleCapture();
+
+  // Store timestamp for next frame
+  currentFrameTimestamp = microsSinceAcquisitionStart;
 
   currentSample.left = {'L', sensor.left.readDisplacement(units)};
   currentSample.right = {'R', sensor.right.readDisplacement(units)};
@@ -194,7 +238,6 @@ void captureDisplacement() {
   if (sampleCountRemaining >= 0) {
     sampleCountRemaining--;
   }
-  currentSampleTimestamp = microsSinceAcquisitionStart;
 
   // Reset Trigger Outputs
   fastDigitalWrite(TRIGGER_OUT_2_PIN, TRIGGER_ACTIVE_STATE);

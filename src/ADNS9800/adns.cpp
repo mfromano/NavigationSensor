@@ -39,6 +39,7 @@ void ADNS::triggerAcquisitionStart() {
   // // SPI.transfer((uint8_t)RegisterAddress::Motion | 0x80);
   // // SPI.transfer(0x00);
   SPI.transfer((uint8_t)RegisterAddress::Motion_Burst & 0x7f);
+  SPI.transfer(_readout.data, adns_readout_max_size);
 
   // Set Start-Time Microsecond Offset
   _microsSinceStart = 0;
@@ -51,16 +52,22 @@ void ADNS::triggerAcquisitionStart() {
 
   // Release SPI Bus and Interrupts Hold
   deselect();
-  interrupts();
 
   // Set Flag to Indicate Running State
   _runningFlag = true;
+
+  interrupts();
 }
 
 // Read from ADNS9800 Sensor and Update _currentCapture & _sample
 void ADNS::triggerSampleCapture() {
   // Trigger Start if Not Running
   if (!_runningFlag) triggerAcquisitionStart();
+
+  // Wait if min sample period has not passed
+  while (_microsSinceCapture < _minSamplePeriodUs) {
+    yield();
+  };
 
   // Disable Interrupts and Lock SPI Bus
   noInterrupts();
@@ -70,9 +77,9 @@ void ADNS::triggerSampleCapture() {
   SPI.transfer((byte)RegisterAddress::Motion_Burst & 0x7f);
 
   // Read Latched Data from Sensor Registers
-  while (_microsSinceCapture < _minSamplePeriodUs) {
-    yield();
-  };
+  // while (_microsSinceCapture < _minSamplePeriodUs) {
+  //   yield();
+  // };
   SPI.transfer(_readout.data, adns_readout_max_size);
 
   // Latch Elapsed Microseconds at End Of Sample

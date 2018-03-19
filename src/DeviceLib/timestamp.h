@@ -6,7 +6,21 @@
 #ifndef TIMESTAMP_h
 #define TIMESTAMP_h
 
-// #include <Arduino.h>
+#include <Arduino.h>
+
+// uint64_t launchTime = 0;
+
+// uint64_t getCurTime() {
+// static uint64_t lastTime = launchTime;
+// uint32_t diffTime = micros() - lastTime;
+// uint64_t t = micros() + launchTime;
+// return t;
+// todo
+//  Serial.println(t/);
+// sprintf(tsBuffer, "%lu.%06lu", (uint32_t)(t / 1000000),
+//         (uint32_t)(t % 1000000));
+// }
+
 // #include <Time.h>
 
 // #include <inttypes.h>

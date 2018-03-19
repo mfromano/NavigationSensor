@@ -4,14 +4,16 @@
 
 */
 
+#ifndef MAINCONFIG_h
+#define MAINCONFIG_h
+
 // Arduino Includes
 #include <Arduino.h>
+#include <Bounce2.h>  //todo
 #include <CircularBuffer.h>
 #include <DigitalIO.h>
 #include <SPI.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <time.h>
+// #include "teensy_stl.h"
 
 // Standard Template Library Includes (uCLibC++ port or ETL)
 // #include <"ArduinoSTL.h">
@@ -107,14 +109,16 @@ const String flatFieldNames[] = {
 // =============================================================================
 
 // Task: INITIALIZE
-bool initializeSensors();
-bool initializeClocks();
-bool initializeTriggering();
-bool initializeCommunication();
+static inline bool initializeCommunication();
+static inline bool initializeSensors();
+static inline bool initializeClocks();
+static inline bool initializeTriggering();
 
 // Task: IDLE
 static inline void receiveCommand();
 static inline void beginAcquisition();
+static inline void beginDataFrame();
+static inline void endDataFrame();
 static inline void endAcquisition();
 
 // Task: TRIGGERED_ACQUISITION
@@ -130,3 +134,5 @@ static void sendData();
 //      or  {<measurement>,[tags], [field], timestamp}
 //                field ->  {field-name, field-value}
 //                tag ->    {tag-name, tag-value}
+
+#endif
