@@ -48,7 +48,7 @@ void setup() {
     Serial.println(fileVersion);
   }
   delay(400);
-  printBoardID();
+  // printBoardID();
 
   success = initializeSensors();
   // if (success) {
@@ -67,11 +67,9 @@ void setup() {
 void loop() {
   if (onoffSwitch.update()) {
     if (onoffSwitch.fell()) {
-      Serial.println("falling edge");
       beginAcquisition();
     } else {
       if (onoffSwitch.rose()) {
-        Serial.println("rising edge");
         endAcquisition();
       }
     }
